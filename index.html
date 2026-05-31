@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boulderline · Caisse Journalière</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#16140f;--paper:#f4f0e6;--paper-2:#fbf8f0;--line:#ddd5c2;--accent:#e8552a;--accent-2:#1f6f5c;--gold:#caa64a;--danger:#c0392b;--bo:#3a5ba0;--muted:#8a8267;--shadow:0 18px 50px -22px rgba(30,25,15,.45);}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Instrument Sans',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;background-image:radial-gradient(circle at 12% 8%,rgba(232,85,42,.07),transparent 42%),radial-gradient(circle at 88% 92%,rgba(31,111,92,.07),transparent 45%);}
+  .mono{font-family:'DM Mono',monospace;font-feature-settings:"tnum" 1}
+  .fullscreen{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--ink);background-image:radial-gradient(circle at 20% 20%,rgba(232,85,42,.22),transparent 45%),radial-gradient(circle at 80% 80%,rgba(31,111,92,.22),transparent 45%);}
+  .panel{width:100%;max-width:420px;background:var(--paper-2);border-radius:22px;padding:40px 34px;box-shadow:var(--shadow);text-align:center;animation:rise .6s cubic-bezier(.2,.8,.2,1) both;}
+  .badge-ic{width:60px;height:60px;border-radius:16px;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:28px;box-shadow:0 10px 24px -8px var(--accent);}
+  .badge-ic.bo{background:var(--bo);box-shadow:0 10px 24px -8px var(--bo)}
+  .panel h1{font-family:'Bricolage Grotesque';font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .panel .sub{color:var(--muted);font-size:14px;margin:6px 0 26px}
+  .pwd-field input{width:100%;padding:15px 16px;border:1.5px solid var(--line);border-radius:13px;font-size:16px;font-family:'DM Mono',monospace;text-align:center;letter-spacing:.18em;background:#fff;transition:.2s;}
+  .pwd-field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(232,85,42,.14)}
+  .panel .go{width:100%;margin-top:14px;padding:15px;border:none;border-radius:13px;background:var(--ink);color:#fff;font-family:'Bricolage Grotesque';font-weight:600;font-size:16px;cursor:pointer;transition:.18s;}
+  .panel .go:hover{background:var(--accent);transform:translateY(-1px)}
+  .lock-err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px;font-weight:500}
+  .shake{animation:shake .4s}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+  @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+  .room-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+  .room-card{padding:26px 16px;border:1.5px solid var(--line);border-radius:16px;background:#fff;cursor:pointer;transition:.18s;text-align:center}
+  .room-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 12px 28px -16px var(--accent)}
+  .room-card .rname{font-family:'Bricolage Grotesque';font-size:30px;font-weight:800;color:var(--ink)}
+  .room-card .rsub{font-size:12px;color:var(--muted);margin-top:4px}
+  .room-card.bl3 .rname{color:var(--accent-2)}
+  #app{display:none;max-width:1120px;margin:0 auto;padding:24px 18px 90px}
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .brand{display:flex;align-items:center;gap:13px}
+  .brand .logo{width:46px;height:46px;border-radius:13px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque';font-weight:800;font-size:17px}
+  .brand .logo.bl3{background:var(--accent-2)}
+  .brand h1{font-family:'Bricolage Grotesque';font-size:21px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+  .brand small{color:var(--muted);font-size:12.5px}
+  .top-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .date-pick{display:flex;align-items:center;gap:8px;background:var(--paper-2);border:1.5px solid var(--line);border-radius:12px;padding:7px 12px}
+  .date-pick input{border:none;background:transparent;font-family:'DM Mono';font-size:14px;color:var(--ink)}
+  .date-pick input:focus{outline:none}
+  .mini-btn{background:none;border:1.5px solid var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;transition:.18s}
+  .mini-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .tabs{display:flex;gap:6px;margin-bottom:18px;background:var(--paper-2);border:1.5px solid var(--line);border-radius:14px;padding:5px;width:fit-content;flex-wrap:wrap}
+  .tab{padding:9px 16px;border:none;background:none;border-radius:10px;font-family:'Instrument Sans';font-weight:600;font-size:14px;color:var(--muted);cursor:pointer;transition:.15s;display:flex;align-items:center;gap:6px}
+  .tab.active{background:var(--ink);color:#fff}
+  .tab .lk{font-size:11px}
+  .grid{display:grid;grid-template-columns:1fr 330px;gap:18px;align-items:start}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--paper-2);border:1.5px solid var(--line);border-radius:18px;padding:20px 20px 8px;margin-bottom:18px}
+  .card h2{font-family:'Bricolage Grotesque';font-size:16px;font-weight:600;display:flex;align-items:center;gap:9px;margin-bottom:4px;letter-spacing:-.01em}
+  .card h2 .dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+  .card h2.green .dot{background:var(--accent-2)}.card h2.gold .dot{background:var(--gold)}.card h2.bo .dot{background:var(--bo)}
+  .card .hint{font-size:12px;color:var(--muted);margin-bottom:14px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;padding:0 7px 8px}
+  th.r,td.r{text-align:right}th.c,td.c{text-align:center}
+  td{padding:5px 7px;border-top:1px solid rgba(221,213,194,.6)}
+  td.den{font-family:'DM Mono';font-size:14px}
+  .qty{width:74px;padding:8px 9px;border:1.5px solid var(--line);border-radius:9px;font-family:'DM Mono';font-size:14px;text-align:right;background:#fff;transition:.15s}
+  .qty:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,85,42,.12)}
+  .amt{font-family:'DM Mono';font-size:14px}.amt.zero{color:#c3bca6}
+  tfoot td{border-top:2px solid var(--line);font-weight:600;padding-top:11px}
+  .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.ctrl{min-width:580px}
+  table.ctrl input{width:84px;padding:7px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:'DM Mono';font-size:13px;text-align:right;background:#fff;transition:.15s}
+  table.ctrl input:focus{outline:none;border-color:var(--bo);box-shadow:0 0 0 3px rgba(58,91,160,.14)}
+  td.type{font-weight:600;font-size:13.5px}
+  td.cc{font-family:'DM Mono';font-size:13.5px;color:var(--muted)}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600}
+  .badge.ok{background:#d8efe4;color:#1f6f5c}.badge.warn{background:#fbeccb;color:#9a7a16}.badge.err{background:#f7d7d2;color:#c0392b}.badge.none{background:#e7e2d4;color:#8a8267}
+  .ecart-val.bad{color:var(--danger);font-weight:600}
+  .field-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:9px 0;border-top:1px solid rgba(221,213,194,.6)}
+  .field-row:first-of-type{border-top:none}
+  .field-row .euro{position:relative}
+  .field-row input{width:130px;padding:9px 26px 9px 11px;border:1.5px solid var(--line);border-radius:10px;font-family:'DM Mono';font-size:14px;text-align:right;background:#fff}
+  .field-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,85,42,.12)}
+  .euro::after{content:"€";position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-family:'DM Mono';font-size:13px;pointer-events:none}
+  .summary{position:sticky;top:18px}
+  .summary .card{background:var(--ink);border-color:var(--ink);color:#f4f0e6}
+  .summary h2{color:#fff}
+  .sum-line{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;font-size:14px;border-top:1px solid rgba(255,255,255,.1)}
+  .sum-line:first-of-type{border-top:none}
+  .sum-line .lbl{color:#cfc8b3}.sum-line .val{font-family:'DM Mono';font-size:15px}
+  .sum-total{margin-top:12px;padding:16px;border-radius:13px;background:var(--accent);display:flex;flex-direction:column;gap:3px}
+  .sum-total .t-lbl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#ffe2d6}
+  .sum-total .t-val{font-family:'Bricolage Grotesque';font-weight:800;font-size:28px;color:#fff;line-height:1}
+  .sum-ecart{margin-top:12px;padding:16px;border-radius:13px;display:flex;flex-direction:column;gap:5px;transition:.25s}
+  .sum-ecart.ok{background:var(--accent-2)}.sum-ecart.warn{background:#b8862a}.sum-ecart.err{background:var(--danger)}
+  .sum-ecart .t-lbl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.85)}
+  .sum-ecart .t-val{font-family:'Bricolage Grotesque';font-weight:800;font-size:28px;color:#fff;line-height:1}
+  .sum-ecart .t-st{font-size:13px;color:#fff;font-weight:600}
+  .save-btn{width:100%;margin-top:14px;padding:14px;border:none;border-radius:12px;background:#fff;color:var(--ink);font-family:'Bricolage Grotesque';font-weight:600;font-size:15px;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .save-btn:hover{background:var(--accent);color:#fff;transform:translateY(-1px)}
+  .summary.bo .save-btn:hover{background:var(--bo)}
+  .saved-note{font-size:12px;color:#cfc8b3;text-align:center;margin-top:9px;min-height:16px}
+  .actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+  .actions button{padding:11px 4px;border:none;border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font-family:'Instrument Sans';font-weight:600;font-size:12.5px;cursor:pointer;transition:.15s}
+  .actions button:hover{filter:brightness(1.15)}
+  #controleView,#archivesView{display:none}
+  #ctrlLock{padding:30px}
+  #ctrlLock .panel{margin:0 auto;box-shadow:none;border:1.5px solid var(--line)}
+  .empty-state{color:var(--muted);text-align:center;padding:36px 12px;font-size:14px;line-height:1.6}
+  .arch-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border:1.5px solid var(--line);border-radius:13px;background:var(--paper-2);margin-bottom:9px;flex-wrap:wrap}
+  .arch-row .a-date{font-family:'DM Mono';font-weight:500;font-size:14px;min-width:118px;text-transform:capitalize}
+  .arch-row .a-tot{font-family:'DM Mono';font-size:12.5px;color:var(--muted)}
+  .arch-row .a-spacer{flex:1}
+  .arch-row button{border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ink);transition:.15s}
+  .arch-row button:hover{border-color:var(--accent);color:var(--accent)}
+  .arch-row button.del:hover{border-color:var(--danger);color:var(--danger)}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:13px;font-size:14px;box-shadow:var(--shadow);opacity:0;transition:.35s cubic-bezier(.2,.8,.2,1);z-index:60}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  @media print{.fullscreen,.top-actions,.tabs,.actions,.save-btn,.saved-note{display:none!important}body{background:#fff}.card{break-inside:avoid;border-color:#ccc}.summary{position:static}.summary .card{background:#fff;color:#000;border:1.5px solid #000}.summary h2,.sum-line .lbl,.sum-line .val{color:#000}}
+</style>
+</head>
+<body>
+
+<div id="lock" class="fullscreen">
+  <div class="panel" id="lockPanel">
+    <div class="badge-ic">🔒</div><h1>Caisse Journalière</h1><p class="sub">Boulderline · accès accueil</p>
+    <div class="pwd-field"><input type="password" id="pwd" placeholder="• • • • • •" autocomplete="off" autofocus></div>
+    <button class="go" id="unlockBtn">Déverrouiller</button><p class="lock-err" id="lockErr"></p>
+  </div>
+</div>
+
+<div id="rooms" class="fullscreen" style="display:none">
+  <div class="panel">
+    <div class="badge-ic">▲</div><h1>Choisis ta salle</h1><p class="sub">Pour quelle salle saisis-tu la caisse&nbsp;?</p>
+    <div class="room-grid">
+      <div class="room-card" data-room="BL1"><div class="rname">BL1</div><div class="rsub">Boulderline 1</div></div>
+      <div class="room-card bl3" data-room="BL3"><div class="rname">BL3</div><div class="rsub">Boulderline 3</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" id="roomLogo">BL1</div>
+      <div><h1>Caisse Journalière</h1><small id="roomSub">Salle BL1 — fond de caisse&nbsp;: 250,80&nbsp;€</small></div>
+    </div>
+    <div class="top-actions">
+      <div class="date-pick"><span>📅</span><input type="date" id="dateJour"></div>
+      <button class="mini-btn" id="switchRoom">↔ Salle</button>
+      <button class="mini-btn" id="relock">🔒</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-view="saisie">📥 Saisie caisse</button>
+    <button class="tab" data-view="controle">🔐 Contrôle des écarts <span class="lk">(back office)</span></button>
+    <button class="tab" data-view="archives">🗂 Archives</button>
+  </div>
+
+  <!-- ===== SAISIE (ACCUEIL) ===== -->
+  <div id="saisieView">
+    <div class="grid">
+      <div class="main">
+        <div class="card">
+          <h2><span class="dot"></span>Espèces comptées</h2>
+          <p class="hint">Quantité de chaque billet / pièce dans la caisse en fin de journée.</p>
+          <table>
+            <thead><tr><th>Dénomination</th><th class="r">Qté</th><th class="r">Montant</th></tr></thead>
+            <tbody id="especesBody"></tbody>
+            <tfoot><tr><td colspan="2">Total espèces comptées</td><td class="r mono" id="totalEspeces">0,00 €</td></tr></tfoot>
+          </table>
+        </div>
+        <div class="card">
+          <h2 class="green"><span class="dot"></span>Chèques ANCV papier</h2>
+          <p class="hint">Nombre de chèques-vacances papier par valeur.</p>
+          <table>
+            <thead><tr><th>Valeur</th><th class="r">Qté</th><th class="r">Montant</th></tr></thead>
+            <tbody id="ancvBody"></tbody>
+            <tfoot><tr><td colspan="2">Total ANCV papier</td><td class="r mono" id="totalAncv">0,00 €</td></tr></tfoot>
+          </table>
+        </div>
+        <div class="card">
+          <h2 class="gold"><span class="dot"></span>Correction</h2>
+          <p class="hint">Erreur de carte bancaire relevée sur la journée.</p>
+          <div class="field-row"><label>Erreur CB <span style="color:var(--muted);font-size:12px">(déduite des espèces)</span></label><div class="euro"><input type="number" step="0.01" id="erreurCB" placeholder="0,00"></div></div>
+        </div>
+      </div>
+      <aside class="summary">
+        <div class="card">
+          <h2 style="color:#fff"><span class="dot"></span>Caisse comptée (accueil)</h2>
+          <div class="sum-line"><span class="lbl">Espèces</span><span class="val" id="rEspeces">0,00 €</span></div>
+          <div class="sum-line"><span class="lbl">ANCV papier</span><span class="val" id="rAncv">0,00 €</span></div>
+          <div class="sum-total"><span class="t-lbl">Total compté (accueil)</span><span class="t-val" id="sComptee">0,00 €</span></div>
+          <div class="sum-line" style="margin-top:6px"><span class="lbl">Espèces à déposer</span><span class="val" id="sEspDepot">0,00 €</span></div>
+          <button class="save-btn" id="saveBtn">💾 Enregistrer la caisse</button>
+          <p class="saved-note" id="savedNote"></p>
+          <div class="actions"><button id="copyBtn">📋 Copier</button><button id="csvBtn">⬇ CSV</button><button id="printBtn">🖨 PDF</button></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ===== CONTRÔLE (BACK OFFICE) ===== -->
+  <div id="controleView">
+    <div id="ctrlLock">
+      <div class="panel">
+        <div class="badge-ic bo">🔐</div><h1>Contrôle des écarts</h1><p class="sub">Espace réservé au back office</p>
+        <div class="pwd-field"><input type="password" id="ctrlPwd" placeholder="• • • • • •" autocomplete="off"></div>
+        <button class="go" id="ctrlUnlockBtn" style="background:var(--bo)">Accéder au contrôle</button>
+        <p class="lock-err" id="ctrlErr"></p>
+      </div>
+    </div>
+    <div id="ctrlContent" style="display:none">
+      <div id="ctrlEmpty" class="card" style="display:none"><div class="empty-state">Aucune caisse enregistrée par l'accueil pour cette salle à cette date.<br>Vérifie la salle et la date — ou attends que l'accueil ait validé sa saisie.</div></div>
+      <div class="grid" id="ctrlGrid">
+        <div class="main">
+          <div class="card">
+            <h2 class="bo"><span class="dot"></span>Contrôle des écarts</h2>
+            <p class="hint">Espèces et ANCV viennent de l'accueil. Saisis les montants CB Yavin / ANCV Connect / Compte Client / Sur Devis, puis les collectes BETA + ZELTY. Écart&nbsp;= comptée − encaissé · OK&nbsp;&lt;0,01&nbsp;€ · ⚠&nbsp;&lt;5&nbsp;€ · ÉCART au-delà.</p>
+            <div class="scroll-x">
+              <table class="ctrl">
+                <thead><tr><th>Type</th><th class="r">Caisse comptée</th><th class="r">BETA</th><th class="r">ZELTY</th><th class="r">Encaissé</th><th class="r">Écart</th><th class="c">Statut</th></tr></thead>
+                <tbody id="ctrlBody"></tbody>
+                <tfoot><tr><td>Totaux</td><td class="r mono" id="tComptee">0,00 €</td><td colspan="2" class="r mono" id="tCollecte">0,00 €</td><td></td><td class="r mono" id="tEcart">0,00 €</td><td class="c" id="tStatut"></td></tr></tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+        <aside class="summary bo">
+          <div class="card">
+            <h2 style="color:#fff"><span class="dot" style="background:var(--bo)"></span>Résultat du contrôle</h2>
+            <div class="sum-line"><span class="lbl">Total caisse comptée</span><span class="val" id="rComptee">0,00 €</span></div>
+            <div class="sum-line"><span class="lbl">Total collecté</span><span class="val" id="rCollecte">0,00 €</span></div>
+            <div class="sum-ecart ok" id="ecartBox"><span class="t-lbl">Écart global</span><span class="t-val" id="ecartGlobal">0,00 €</span><span class="t-st" id="statutGlobal">✓ Aucun écart</span></div>
+            <button class="save-btn" id="saveCtrlBtn">💾 Enregistrer le contrôle</button>
+            <p class="saved-note" id="ctrlSavedNote"></p>
+            <div class="actions"><button id="copyCtrlBtn">📋 Copier</button><button id="csvCtrlBtn">⬇ CSV</button><button id="printCtrlBtn">🖨 PDF</button></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ARCHIVES ===== -->
+  <div id="archivesView">
+    <div class="card" style="padding-bottom:18px">
+      <h2><span class="dot"></span>Caisses archivées — <span id="archRoomLabel">BL1</span></h2>
+      <p class="hint">Historique local de ce poste. « à contrôler » = en attente du back office.</p>
+      <div id="archList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   ⚙️  PARAMÈTRES
+   ===================================================================== */
+const MOT_DE_PASSE   = "CashCount$";        // accès accueil (saisie)
+const MDP_CONTROLE   = "BL2017*";           // accès back office (contrôle)
+const FOND_DE_CAISSE = 250.80;
+// URL de ton Google Apps Script déployé (voir Code.gs). INDISPENSABLE pour
+// le travail sur 2 postes : c'est par là que le back office lit la caisse de l'accueil.
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxoOvGmLVZ8p1X3ZvcpC6X_Q09ZDxGZoqkaY9k3r8GLipvoOwTpYuOyj2UNgf4tgqjIXA/exec";
+
+const ESPECES = [100,50,20,10,5,2,1,0.5,0.2,0.1,0.05,0.02,0.01];
+const ANCV    = [50,40,30,25,20,10];
+const ROWS = [
+  {key:'especes',     label:'Espèces',      auto:true },  // comptée = accueil
+  {key:'ancv',        label:'ANCV papier',  auto:true },  // comptée = accueil
+  {key:'cbYavin',     label:'CB Yavin',     auto:false},  // comptée = back office
+  {key:'ancvConnect', label:'ANCV Connect', auto:false},
+  {key:'compteClient',label:'Compte Client',auto:false},
+  {key:'surDevis',    label:'Sur Devis',    auto:false},
+];
+let SALLE='BL1', controlUnlocked=false, currentRecord=null;
+
+/* ---------- Stockage local (cache) ---------- */
+const Store={
+  async get(k){if(typeof window.storage!=='undefined'){try{const r=await window.storage.get(k);return r?r.value:null;}catch(e){return null;}}try{return localStorage.getItem(k);}catch(e){return null;}},
+  async set(k,v){if(typeof window.storage!=='undefined'){try{return await window.storage.set(k,v);}catch(e){}}try{localStorage.setItem(k,v);}catch(e){}},
+  async del(k){if(typeof window.storage!=='undefined'){try{return await window.storage.delete(k);}catch(e){}}try{localStorage.removeItem(k);}catch(e){}},
+  async list(p){if(typeof window.storage!=='undefined'){try{const r=await window.storage.list(p);return r?r.keys:[];}catch(e){return [];}}try{const ks=[];for(let i=0;i<localStorage.length;i++){const kk=localStorage.key(i);if(!p||kk.startsWith(p))ks.push(kk);}return ks;}catch(e){return [];}}
+};
+const keyFor=(s,d)=>`caisse:${s}:${d}`;
+async function getLocal(s,d){const raw=await Store.get(keyFor(s,d));if(!raw)return null;try{return JSON.parse(raw);}catch(e){return null;}}
+
+/* ---------- Google Sheets : écriture (POST) + lecture cross-poste (JSONP) ---------- */
+function syncToSheet(rec){
+  if(!GAS_URL)return;
+  try{fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(rec)});
+    toast('Synchronisé avec Google Sheets ✓');}catch(e){toast('Sync Sheets impossible (gardé en local)');}
+}
+function jsonpGet(params){
+  return new Promise((resolve,reject)=>{
+    if(!GAS_URL){resolve(null);return;}
+    const cb='__cb'+Date.now()+Math.floor(Math.random()*1e4);
+    const s=document.createElement('script');
+    const timer=setTimeout(()=>{cleanup();reject(new Error('timeout'));},12000);
+    function cleanup(){clearTimeout(timer);try{delete window[cb];}catch(e){}if(s.parentNode)s.parentNode.removeChild(s);}
+    window[cb]=d=>{cleanup();resolve(d);};
+    const q=Object.entries(params).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
+    s.src=GAS_URL+'?'+q+'&callback='+cb;
+    s.onerror=()=>{cleanup();reject(new Error('jsonp error'));};
+    document.body.appendChild(s);
+  });
+}
+async function getRemote(s,d){try{const r=await jsonpGet({action:'get',salle:s,date:d});return (r&&r.found&&r.record)?r.record:null;}catch(e){return null;}}
+
+// Source de vérité = Google Sheets si configuré ; sinon cache local.
+async function loadRecord(s,d){
+  if(GAS_URL){const r=await getRemote(s,d);if(r){await Store.set(keyFor(s,d),JSON.stringify(r));return r;}}
+  return await getLocal(s,d);
+}
+async function putRecord(rec){await Store.set(keyFor(rec.salle,rec.date),JSON.stringify(rec));syncToSheet(rec);}
+
+/* ---------- Utils ---------- */
+const eur=n=>(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const signEur=n=>(n<0?'−':'')+eur(Math.abs(n));
+const labelDen=v=>v>=5?`Billet ${v} €`:`Pièce ${v.toLocaleString('fr-FR')} €`;
+const $=id=>document.getElementById(id);
+const num=id=>{const el=$(id);return el?(parseFloat(el.value)||0):0;};
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2300);}
+function statutFor(e){const a=Math.abs(e);if(a<0.01)return{cls:'ok',txt:'OK'};if(a<5)return{cls:'warn',txt:'⚠'};return{cls:'err',txt:'ÉCART'};}
+function localDate(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);}
+
+/* ---------- Verrou accueil ---------- */
+function tryUnlock(){if($('pwd').value===MOT_DE_PASSE){$('lock').style.display='none';$('rooms').style.display='flex';}
+  else{$('lockErr').textContent='Mot de passe incorrect';$('lockPanel').classList.remove('shake');void $('lockPanel').offsetWidth;$('lockPanel').classList.add('shake');$('pwd').value='';$('pwd').focus();}}
+$('unlockBtn').addEventListener('click',tryUnlock);
+$('pwd').addEventListener('keydown',e=>{if(e.key==='Enter')tryUnlock();});
+$('relock').addEventListener('click',()=>{$('app').style.display='none';$('rooms').style.display='none';$('lock').style.display='flex';$('pwd').value='';$('lockErr').textContent='';controlUnlocked=false;$('pwd').focus();});
+
+/* ---------- Choix salle ---------- */
+document.querySelectorAll('.room-card').forEach(c=>c.addEventListener('click',()=>chooseRoom(c.dataset.room)));
+function chooseRoom(s){SALLE=s;const b=s==='BL3';$('roomLogo').textContent=s;$('roomLogo').classList.toggle('bl3',b);
+  $('roomSub').textContent=`Salle ${s} — fond de caisse : 250,80 €`;$('archRoomLabel').textContent=s;
+  $('rooms').style.display='none';$('app').style.display='block';switchView('saisie');loadSaisie();}
+$('switchRoom').addEventListener('click',()=>{$('app').style.display='none';$('rooms').style.display='flex';});
+
+/* ---------- Tableaux ---------- */
+function buildDenoms(list,id,p,ancv){const tb=$(id);list.forEach((v,i)=>{const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="den">${ancv?'ANCV '+v+' €':labelDen(v)}</td><td class="r"><input class="qty" type="number" min="0" step="1" id="${p}${i}" placeholder="0"></td><td class="r"><span class="amt zero" id="${p}m${i}">0,00 €</span></td>`;tb.appendChild(tr);});}
+buildDenoms(ESPECES,'especesBody','e',false);
+buildDenoms(ANCV,'ancvBody','a',true);
+
+function buildCtrl(){const tb=$('ctrlBody');ROWS.forEach(r=>{
+  const comptee=r.auto?`<span class="mono" id="cc_${r.key}">0,00 €</span>`:`<input type="number" step="0.01" id="cc_${r.key}" placeholder="0,00">`;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="type">${r.label}</td><td class="r cc">${comptee}</td>
+    <td class="r"><input type="number" step="0.01" id="beta_${r.key}" placeholder="0,00"></td>
+    <td class="r"><input type="number" step="0.01" id="zelty_${r.key}" placeholder="0,00"></td>
+    <td class="r mono" id="enc_${r.key}">0,00 €</td><td class="r mono ecart-val" id="ec_${r.key}">0,00 €</td>
+    <td class="c"><span class="badge none" id="st_${r.key}">—</span></td>`;tb.appendChild(tr);});}
+buildCtrl();
+
+/* ---------- Calcul SAISIE (espèces + ANCV + erreur CB) ---------- */
+function computeSaisie(){
+  let totEsp=0;ESPECES.forEach((v,i)=>{const m=(parseInt($('e'+i).value)||0)*v;totEsp+=m;const c=$('em'+i);c.textContent=eur(m);c.classList.toggle('zero',m===0);});
+  let totAncv=0;ANCV.forEach((v,i)=>{const m=(parseInt($('a'+i).value)||0)*v;totAncv+=m;const c=$('am'+i);c.textContent=eur(m);c.classList.toggle('zero',m===0);});
+  const erreur=num('erreurCB');
+  const espComptee=totEsp-FOND_DE_CAISSE-erreur;
+  $('totalEspeces').textContent=eur(totEsp);$('totalAncv').textContent=eur(totAncv);
+  $('rEspeces').textContent=eur(espComptee);$('rAncv').textContent=eur(totAncv);
+  $('sComptee').textContent=eur(espComptee+totAncv);$('sEspDepot').textContent=eur(espComptee);
+  return {totEsp,totAncv,erreur,especes:espComptee,ancv:totAncv};
+}
+
+/* ---------- Calcul CONTRÔLE ---------- */
+function ctrlComptee(){
+  const c={};ROWS.forEach(r=>{
+    if(r.auto)c[r.key]=(currentRecord&&currentRecord.comptee&&currentRecord.comptee[r.key])||0;
+    else c[r.key]=num('cc_'+r.key);
+  });return c;
+}
+function computeControl(){
+  const comptee=ctrlComptee();let tc=0,tcol=0,worst='ok';const ord={ok:0,warn:1,err:2,none:0};
+  ROWS.forEach(r=>{const c=comptee[r.key]||0;if(r.auto)$('cc_'+r.key).textContent=eur(c);
+    const enc=num('beta_'+r.key)+num('zelty_'+r.key);const ec=c-enc;tc+=c;tcol+=enc;
+    $('enc_'+r.key).textContent=eur(enc);const ecCell=$('ec_'+r.key);ecCell.textContent=signEur(ec);ecCell.classList.toggle('bad',Math.abs(ec)>=5);
+    const s=statutFor(ec);const b=$('st_'+r.key);b.className='badge '+s.cls;b.textContent=s.txt;if(ord[s.cls]>ord[worst])worst=s.cls;});
+  const ecart=tc-tcol;
+  $('tComptee').textContent=eur(tc);$('tCollecte').textContent=eur(tcol);$('tEcart').textContent=signEur(ecart);
+  const sg=statutFor(ecart);$('tStatut').innerHTML=`<span class="badge ${sg.cls}">${sg.txt}</span>`;
+  $('rComptee').textContent=eur(tc);$('rCollecte').textContent=eur(tcol);$('ecartGlobal').textContent=signEur(ecart);
+  $('ecartBox').className='sum-ecart '+worst;
+  $('statutGlobal').textContent=worst==='ok'?'✓ Aucun écart':worst==='warn'?'⚠ Écart mineur à vérifier':'✕ Écart important !';
+  return {comptee,tc,tcol,ecart,statut:sg.txt};
+}
+
+document.addEventListener('input',e=>{if(!e.target.matches('input'))return;
+  if($('saisieView').contains(e.target))computeSaisie();
+  else if($('controleView').contains(e.target)&&e.target.id!=='ctrlPwd')computeControl();});
+
+/* ---------- Date par défaut = la veille ---------- */
+const veille=new Date();veille.setDate(veille.getDate()-1);
+$('dateJour').value=localDate(veille);
+$('dateJour').addEventListener('change',()=>{const v=document.querySelector('.tab.active').dataset.view;
+  if(v==='saisie')loadSaisie();else if(v==='controle'&&controlUnlocked)loadControl();else if(v==='archives')renderArchives();});
+
+/* ---------- Saisie : charger / enregistrer ---------- */
+function clearSaisie(){document.querySelectorAll('#saisieView input[type=number]').forEach(i=>i.value='');}
+async function loadSaisie(){
+  clearSaisie();$('savedNote').textContent='Chargement…';
+  const rec=await loadRecord(SALLE,$('dateJour').value);currentRecord=rec;
+  if(rec){
+    ESPECES.forEach((v,i)=>$('e'+i).value=(rec.especes&&rec.especes[i])||'');
+    ANCV.forEach((v,i)=>$('a'+i).value=(rec.ancv&&rec.ancv[i])||'');
+    $('erreurCB').value=rec.erreurCB||'';
+    $('savedNote').textContent=rec.savedAt?'Saisie existante chargée':'';
+  }else $('savedNote').textContent='';
+  computeSaisie();
+}
+$('saveBtn').addEventListener('click',async()=>{
+  const date=$('dateJour').value;if(!date){toast('Choisis une date');return;}
+  const r=computeSaisie();let rec=await getLocal(SALLE,date)||{};
+  if(GAS_URL){const remote=await getRemote(SALLE,date);if(remote)rec=remote;} // préserve un éventuel contrôle déjà fait
+  rec.salle=SALLE;rec.date=date;rec.savedAt=new Date().toISOString();
+  rec.especes={};ESPECES.forEach((v,i)=>rec.especes[i]=parseInt($('e'+i).value)||0);
+  rec.ancv={};ANCV.forEach((v,i)=>rec.ancv[i]=parseInt($('a'+i).value)||0);
+  rec.erreurCB=r.erreur;
+  rec.comptee=rec.comptee||{};rec.comptee.especes=r.especes;rec.comptee.ancv=r.ancv;
+  rec.totals=recomputeTotals(rec);
+  currentRecord=rec;await putRecord(rec);
+  $('savedNote').textContent='Enregistré ✓ — '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  toast(`Caisse ${SALLE} du ${date} enregistrée ✓`);
+});
+
+function recomputeTotals(rec){const comptee=rec.comptee||{};const ctrl=rec.control||{};let tc=0,tcol=0;
+  ROWS.forEach(r=>{tc+=comptee[r.key]||0;if(ctrl[r.key])tcol+=(ctrl[r.key].beta||0)+(ctrl[r.key].zelty||0);});
+  const ecart=tc-tcol;return{comptee:tc,collecte:tcol,ecart,statut:statutFor(ecart).txt,espDepot:comptee.especes||0,hasControl:!!rec.control};}
+
+/* ---------- Contrôle : verrou + charger + enregistrer ---------- */
+function tryCtrlUnlock(){if($('ctrlPwd').value===MDP_CONTROLE){controlUnlocked=true;$('ctrlLock').style.display='none';$('ctrlContent').style.display='block';loadControl();}
+  else{$('ctrlErr').textContent='Mot de passe incorrect';$('ctrlPwd').value='';$('ctrlPwd').focus();}}
+$('ctrlUnlockBtn').addEventListener('click',tryCtrlUnlock);
+$('ctrlPwd').addEventListener('keydown',e=>{if(e.key==='Enter')tryCtrlUnlock();});
+
+async function loadControl(){
+  $('ctrlSavedNote').textContent='Chargement…';
+  const rec=await loadRecord(SALLE,$('dateJour').value);currentRecord=rec;
+  if(!rec||!rec.savedAt){$('ctrlGrid').style.display='none';$('ctrlEmpty').style.display='block';$('ctrlSavedNote').textContent='';return;}
+  $('ctrlEmpty').style.display='none';$('ctrlGrid').style.display='grid';
+  const comptee=rec.comptee||{};const ctrl=rec.control||{};
+  ROWS.forEach(r=>{
+    if(!r.auto)$('cc_'+r.key).value=(comptee[r.key]!=null&&comptee[r.key]!==0)?comptee[r.key]:'';
+    const c=ctrl[r.key]||{};$('beta_'+r.key).value=c.beta||'';$('zelty_'+r.key).value=c.zelty||'';
+  });
+  $('ctrlSavedNote').textContent=rec.control?'Contrôle existant chargé':'Caisse accueil chargée';
+  computeControl();
+}
+$('saveCtrlBtn').addEventListener('click',async()=>{
+  const date=$('dateJour').value;let rec=currentRecord;
+  if(!rec){rec=await loadRecord(SALLE,date);}
+  if(!rec||!rec.savedAt){toast('Aucune caisse à contrôler');return;}
+  rec.comptee=rec.comptee||{};
+  ROWS.forEach(r=>{if(!r.auto)rec.comptee[r.key]=num('cc_'+r.key);});
+  rec.control={};ROWS.forEach(r=>rec.control[r.key]={beta:num('beta_'+r.key),zelty:num('zelty_'+r.key)});
+  rec.controlAt=new Date().toISOString();rec.totals=recomputeTotals(rec);
+  currentRecord=rec;await putRecord(rec);
+  $('ctrlSavedNote').textContent='Contrôle enregistré ✓ — '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  toast(`Contrôle ${SALLE} du ${date} enregistré ✓`);
+});
+
+/* ---------- Onglets ---------- */
+function switchView(v){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
+  $('saisieView').style.display=v==='saisie'?'block':'none';
+  $('controleView').style.display=v==='controle'?'block':'none';
+  $('archivesView').style.display=v==='archives'?'block':'none';
+  if(v==='controle'){if(controlUnlocked){$('ctrlLock').style.display='none';$('ctrlContent').style.display='block';loadControl();}else{$('ctrlLock').style.display='block';$('ctrlContent').style.display='none';setTimeout(()=>$('ctrlPwd').focus(),50);}}
+  if(v==='archives')renderArchives();
+}
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchView(t.dataset.view)));
+
+/* ---------- Archives (local) ---------- */
+async function renderArchives(){
+  const list=$('archList');const keys=await Store.list(`caisse:${SALLE}:`);
+  if(!keys.length){list.innerHTML='<div class="empty-state">Aucune caisse archivée sur ce poste.</div>';return;}
+  const recs=[];for(const k of keys){const raw=await Store.get(k);if(raw){try{recs.push(JSON.parse(raw));}catch(e){}}}
+  recs.sort((a,b)=>b.date.localeCompare(a.date));list.innerHTML='';
+  recs.forEach(rec=>{const t=rec.totals||{};const hasCtrl=t.hasControl;
+    const a=Math.abs(t.ecart||0);const cls=!hasCtrl?'none':a<0.01?'ok':a<5?'warn':'err';const txt=!hasCtrl?'à contrôler':a<0.01?'OK':a<5?'⚠':'ÉCART';
+    const d=new Date(rec.date).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short'});
+    const row=document.createElement('div');row.className='arch-row';
+    row.innerHTML=`<span class="a-date">${d}</span><span class="badge ${cls}">${txt}</span>
+      <span class="a-tot">comptée ${eur(t.comptee||0)}${hasCtrl?' · écart '+signEur(t.ecart||0):''}</span>
+      <span class="a-spacer"></span><button data-load="${rec.date}">Ouvrir la saisie</button><button class="del" data-del="${rec.date}">🗑</button>`;
+    list.appendChild(row);});
+  list.querySelectorAll('[data-load]').forEach(b=>b.addEventListener('click',async()=>{$('dateJour').value=b.dataset.load;switchView('saisie');await loadSaisie();}));
+  list.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',async()=>{if(confirm('Supprimer cette caisse archivée ?')){await Store.del(keyFor(SALLE,b.dataset.del));renderArchives();toast('Caisse supprimée');}}));
+}
+
+/* ---------- Exports ---------- */
+function dl(rows,name){const csv=rows.map(x=>x.join(';')).join('\n');const blob=new Blob(["\ufeff"+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();toast('CSV téléchargé ✓');}
+function recapSaisie(){const r=computeSaisie();return `CAISSE COMPTÉE (accueil) — ${SALLE}\nDate : ${$('dateJour').value}\n\nEspèces : ${eur(r.especes)}\nANCV papier : ${eur(r.ancv)}\nErreur CB : ${eur(r.erreur)}\n\nTotal compté : ${eur(r.especes+r.ancv)}\nEspèces à déposer : ${eur(r.especes)}`;}
+$('copyBtn').addEventListener('click',()=>navigator.clipboard.writeText(recapSaisie()).then(()=>toast('Copié ✓')).catch(()=>toast('Copie impossible')));
+$('printBtn').addEventListener('click',()=>window.print());
+$('csvBtn').addEventListener('click',()=>{const r=computeSaisie();const d=$('dateJour').value;dl([['Salle',SALLE],['Date',d],[],['Especes',r.especes.toFixed(2)],['ANCV papier',r.ancv.toFixed(2)],['Erreur CB',r.erreur.toFixed(2)],['Total compte',(r.especes+r.ancv).toFixed(2)]],`caisse_${SALLE}_${d}.csv`);});
+
+function recapCtrl(){const r=computeControl();let t=`CONTRÔLE CAISSE — ${SALLE}\nDate : ${$('dateJour').value}\n\n`;
+  ROWS.forEach(x=>{const enc=num('beta_'+x.key)+num('zelty_'+x.key);const ec=(r.comptee[x.key]||0)-enc;t+=`${x.label} : comptée ${eur(r.comptee[x.key]||0)} | encaissé ${eur(enc)} | écart ${signEur(ec)}\n`;});
+  t+=`\nÉCART GLOBAL : ${signEur(r.ecart)} (${r.statut})`;return t;}
+$('copyCtrlBtn').addEventListener('click',()=>navigator.clipboard.writeText(recapCtrl()).then(()=>toast('Copié ✓')).catch(()=>toast('Copie impossible')));
+$('printCtrlBtn').addEventListener('click',()=>window.print());
+$('csvCtrlBtn').addEventListener('click',()=>{const r=computeControl();const d=$('dateJour').value;
+  let rows=[['Salle',SALLE],['Date',d],[],['Type','Caisse comptee','BETA','ZELTY','Encaisse','Ecart']];
+  ROWS.forEach(x=>{const b=num('beta_'+x.key),z=num('zelty_'+x.key),enc=b+z,ec=(r.comptee[x.key]||0)-enc;rows.push([x.label,(r.comptee[x.key]||0).toFixed(2),b.toFixed(2),z.toFixed(2),enc.toFixed(2),ec.toFixed(2)]);});
+  rows.push([]);rows.push(['Ecart global',r.ecart.toFixed(2)]);rows.push(['Statut',r.statut]);
+  dl(rows,`controle_${SALLE}_${d}.csv`);});
+
+computeSaisie();
+</script>
+</body>
+</html>
