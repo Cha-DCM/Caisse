@@ -160,7 +160,13 @@
 
   <!-- ===== SAISIE (ACCUEIL) ===== -->
   <div id="saisieView">
-    <div class="grid">
+    <div id="saisieLocked" class="card" style="display:none;text-align:center;max-width:560px;margin:0 auto">
+      <div style="font-size:44px;line-height:1;margin:10px 0 4px">✅</div>
+      <h2 style="justify-content:center">Caisse effectuée</h2>
+      <p class="hint" id="saisieLockedMsg" style="margin-bottom:16px"></p>
+      <button class="mini-btn" id="editSaisieBtn">✎ Modifier cette caisse</button>
+    </div>
+    <div class="grid" id="saisieGrid">
       <div class="main">
         <div class="card">
           <h2><span class="dot"></span>Espèces comptées</h2>
@@ -425,17 +431,22 @@ $('dateJour').addEventListener('change',()=>{const v=document.querySelector('.ta
 
 /* ---------- Saisie : charger / enregistrer ---------- */
 function clearSaisie(){document.querySelectorAll('#saisieView input[type=number]').forEach(i=>i.value='');}
+function fillSaisieFromRecord(rec){
+  ESPECES.forEach((v,i)=>$('e'+i).value=(rec.especes&&rec.especes[i])||'');
+  ANCV.forEach((v,i)=>$('a'+i).value=(rec.ancv&&rec.ancv[i])||'');
+  $('erreurCB').value=rec.erreurCB||'';
+}
+function frDate(d){try{return new Date(d).toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}catch(e){return d;}}
+function lockSaisie(){$('saisieGrid').style.display='none';$('saisieLocked').style.display='block';
+  $('saisieLockedMsg').textContent=`La caisse du ${frDate($('dateJour').value)} a bien été enregistrée. Une nouvelle saisie pour cette journée n'est pas possible.`;}
+function unlockSaisie(){$('saisieLocked').style.display='none';$('saisieGrid').style.display='grid';}
 async function loadSaisie(){
   clearSaisie();$('savedNote').textContent='Chargement…';
   const rec=await loadRecord(SALLE,$('dateJour').value);currentRecord=rec;
-  if(rec){
-    ESPECES.forEach((v,i)=>$('e'+i).value=(rec.especes&&rec.especes[i])||'');
-    ANCV.forEach((v,i)=>$('a'+i).value=(rec.ancv&&rec.ancv[i])||'');
-    $('erreurCB').value=rec.erreurCB||'';
-    $('savedNote').textContent=rec.savedAt?'Saisie existante chargée':'';
-  }else $('savedNote').textContent='';
-  computeSaisie();
+  if(rec&&rec.savedAt){fillSaisieFromRecord(rec);computeSaisie();$('savedNote').textContent='';lockSaisie();}
+  else{unlockSaisie();$('savedNote').textContent='';computeSaisie();}
 }
+$('editSaisieBtn').addEventListener('click',()=>{if(currentRecord)fillSaisieFromRecord(currentRecord);computeSaisie();unlockSaisie();});
 $('saveBtn').addEventListener('click',async()=>{
   const date=$('dateJour').value;if(!date){toast('Choisis une date');return;}
   const r=computeSaisie();let rec=await getLocal(SALLE,date)||{};
@@ -447,7 +458,7 @@ $('saveBtn').addEventListener('click',async()=>{
   rec.comptee=rec.comptee||{};rec.comptee.especes=r.especes;rec.comptee.ancv=r.ancv;
   rec.totals=recomputeTotals(rec);
   currentRecord=rec;await putRecord(rec);
-  $('savedNote').textContent='Enregistré ✓ — '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  clearSaisie();computeSaisie();$('savedNote').textContent='';lockSaisie();
   toast(`Caisse ${SALLE} du ${date} enregistrée ✓`);
 });
 
