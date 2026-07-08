@@ -263,7 +263,7 @@
   <div id="archivesView">
     <div class="card" style="padding-bottom:18px">
       <h2><span class="dot"></span>Caisses archivées — <span id="archRoomLabel">BL1</span></h2>
-      <p class="hint">Historique local de ce poste. « à contrôler » = en attente du back office.</p>
+      <p class="hint">Historique lu depuis Google Sheets — identique sur tous les postes. « à contrôler » = en attente du back office.</p>
       <div id="archList"></div>
     </div>
   </div>
@@ -521,9 +521,17 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>swit
 
 /* ---------- Archives (local) ---------- */
 async function renderArchives(){
-  const list=$('archList');const keys=await Store.list(`caisse:${SALLE}:`);
-  if(!keys.length){list.innerHTML='<div class="empty-state">Aucune caisse archivée sur ce poste.</div>';return;}
-  const recs=[];for(const k of keys){const raw=await Store.get(k);if(raw){try{recs.push(JSON.parse(raw));}catch(e){}}}
+  const list=$('archList');list.innerHTML='<div class="empty-state">Chargement…</div>';
+  let recs=[];
+  if(GAS_URL){
+    try{const r=await jsonpGet({action:'list',salle:SALLE});if(r&&r.records)recs=r.records;}catch(e){}
+    for(const rec of recs){try{await Store.set(keyFor(rec.salle,rec.date),JSON.stringify(rec));}catch(e){}}
+  }
+  if(!recs.length){ // repli sur le cache local si le Sheet n'a rien renvoyé
+    const keys=await Store.list(`caisse:${SALLE}:`);
+    for(const k of keys){const raw=await Store.get(k);if(raw){try{recs.push(JSON.parse(raw));}catch(e){}}}
+  }
+  if(!recs.length){list.innerHTML='<div class="empty-state">Aucune caisse archivée pour cette salle.</div>';return;}
   recs.sort((a,b)=>b.date.localeCompare(a.date));list.innerHTML='';
   recs.forEach(rec=>{const t=rec.totals||{};const hasCtrl=t.hasControl;
     const a=Math.abs(t.ecart||0);const cls=!hasCtrl?'none':a<0.01?'ok':a<5?'warn':'err';const txt=!hasCtrl?'à contrôler':a<0.01?'OK':a<5?'⚠':'ÉCART';
@@ -534,8 +542,9 @@ async function renderArchives(){
       <span class="a-spacer"></span><button data-load="${rec.date}">Ouvrir la saisie</button><button class="del" data-del="${rec.date}">🗑</button>`;
     list.appendChild(row);});
   list.querySelectorAll('[data-load]').forEach(b=>b.addEventListener('click',async()=>{$('dateJour').value=b.dataset.load;switchView('saisie');await loadSaisie();}));
-  list.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',async()=>{if(confirm('Supprimer cette caisse archivée ?')){await Store.del(keyFor(SALLE,b.dataset.del));renderArchives();toast('Caisse supprimée');}}));
+  list.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',async()=>{if(confirm('Supprimer cette caisse archivée ? (retirée aussi du Google Sheet)')){await Store.del(keyFor(SALLE,b.dataset.del));deleteRemote(SALLE,b.dataset.del);renderArchives();toast('Caisse supprimée');}}));
 }
+function deleteRemote(s,d){if(!GAS_URL)return;try{fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'delete',salle:s,date:d})});}catch(e){}}
 
 /* ---------- Exports ---------- */
 function dl(rows,name){const csv=rows.map(x=>x.join(';')).join('\n');const blob=new Blob(["\ufeff"+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();toast('CSV téléchargé ✓');}
