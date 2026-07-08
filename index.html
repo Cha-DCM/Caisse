@@ -287,12 +287,14 @@ const ANCV    = [50,40,30,25,20,10];
 // Composition fixe du fond de caisse (250,80 €), quantité par coupure, alignée sur ESPECES
 const FOND_QTE = [0,0,3,3,10,25,35,30,30,40,10,10,10];
 const ROWS = [
-  {key:'especes',     label:'Espèces',      auto:true },  // comptée = accueil
-  {key:'ancv',        label:'ANCV papier',  auto:true },  // comptée = accueil
-  {key:'cbYavin',     label:'CB Yavin',     auto:false},  // comptée = back office
-  {key:'ancvConnect', label:'ANCV Connect', auto:false},
-  {key:'compteClient',label:'Compte Client',auto:false},
-  {key:'surDevis',    label:'Sur Devis',    auto:false},
+  {key:'especes',      label:'Espèces',        ctype:'accueil', reconcile:true},   // comptée = accueil
+  {key:'ancv',         label:'ANCV papier',    ctype:'accueil', reconcile:true},   // comptée = accueil
+  {key:'cbYavin',      label:'CB Yavin',       ctype:'sum',     reconcile:true,  sumOf:['cb','cbTitreResto']}, // = CB + CB Titre Resto
+  {key:'cb',           label:'CB',             ctype:'input',   reconcile:false, component:true}, // composante de CB Yavin
+  {key:'cbTitreResto', label:'CB Titre Resto', ctype:'input',   reconcile:false, component:true}, // composante de CB Yavin
+  {key:'ancvConnect',  label:'ANCV Connect',   ctype:'input',   reconcile:true},
+  {key:'compteClient', label:'Compte Client',  ctype:'input',   reconcile:true},
+  {key:'surDevis',     label:'Sur Devis',      ctype:'input',   reconcile:true},
 ];
 let SALLE='BL1', controlUnlocked=false, currentRecord=null;
 
@@ -369,13 +371,16 @@ function buildCoffre(){const tb=$('coffreBody');ESPECES.forEach((v,i)=>{const tr
 buildCoffre();
 
 function buildCtrl(){const tb=$('ctrlBody');ROWS.forEach(r=>{
-  const comptee=r.auto?`<span class="mono" id="cc_${r.key}">0,00 €</span>`:`<input type="number" step="0.01" id="cc_${r.key}" placeholder="0,00">`;
-  const tr=document.createElement('tr');
-  tr.innerHTML=`<td class="type">${r.label}</td><td class="r cc">${comptee}</td>
-    <td class="r"><input type="number" step="0.01" id="beta_${r.key}" placeholder="0,00"></td>
+  const comptee=(r.ctype==='input')?`<input type="number" step="0.01" id="cc_${r.key}" placeholder="0,00">`:`<span class="mono" id="cc_${r.key}">0,00 €</span>`;
+  let rest;
+  if(r.reconcile){rest=`<td class="r"><input type="number" step="0.01" id="beta_${r.key}" placeholder="0,00"></td>
     <td class="r"><input type="number" step="0.01" id="zelty_${r.key}" placeholder="0,00"></td>
     <td class="r mono" id="enc_${r.key}">0,00 €</td><td class="r mono ecart-val" id="ec_${r.key}">0,00 €</td>
-    <td class="c"><span class="badge none" id="st_${r.key}">—</span></td>`;tb.appendChild(tr);});}
+    <td class="c"><span class="badge none" id="st_${r.key}">—</span></td>`;}
+  else{rest=`<td class="r" style="color:#c3bca6">–</td><td class="r" style="color:#c3bca6">–</td><td class="r" style="color:#c3bca6">–</td><td class="r" style="color:#c3bca6">–</td><td class="c" style="color:#c3bca6">–</td>`;}
+  const lab=r.component?`<span style="color:var(--muted);font-weight:500">↳ ${r.label}</span>`:r.label;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="type">${lab}</td><td class="r cc">${comptee}</td>${rest}`;tb.appendChild(tr);});}
 buildCtrl();
 
 /* ---------- Calcul SAISIE (espèces + ANCV + erreur CB) ---------- */
@@ -400,13 +405,17 @@ function computeSaisie(){
 /* ---------- Calcul CONTRÔLE ---------- */
 function ctrlComptee(){
   const c={};ROWS.forEach(r=>{
-    if(r.auto)c[r.key]=(currentRecord&&currentRecord.comptee&&currentRecord.comptee[r.key])||0;
-    else c[r.key]=num('cc_'+r.key);
-  });return c;
+    if(r.ctype==='accueil')c[r.key]=(currentRecord&&currentRecord.comptee&&currentRecord.comptee[r.key])||0;
+    else if(r.ctype==='input')c[r.key]=num('cc_'+r.key);
+  });
+  ROWS.forEach(r=>{if(r.ctype==='sum')c[r.key]=r.sumOf.reduce((s,k)=>s+(c[k]||0),0);});
+  return c;
 }
 function computeControl(){
   const comptee=ctrlComptee();let tc=0,tcol=0,worst='ok';const ord={ok:0,warn:1,err:2,none:0};
-  ROWS.forEach(r=>{const c=comptee[r.key]||0;if(r.auto)$('cc_'+r.key).textContent=eur(c);
+  ROWS.forEach(r=>{const c=comptee[r.key]||0;
+    if(r.ctype!=='input')$('cc_'+r.key).textContent=eur(c);
+    if(!r.reconcile)return;
     const enc=num('beta_'+r.key)+num('zelty_'+r.key);const ec=c-enc;tc+=c;tcol+=enc;
     $('enc_'+r.key).textContent=eur(enc);const ecCell=$('ec_'+r.key);ecCell.textContent=signEur(ec);ecCell.classList.toggle('bad',Math.abs(ec)>=5);
     const s=statutFor(ec);const b=$('st_'+r.key);b.className='badge '+s.cls;b.textContent=s.txt;if(ord[s.cls]>ord[worst])worst=s.cls;});
@@ -463,7 +472,7 @@ $('saveBtn').addEventListener('click',async()=>{
 });
 
 function recomputeTotals(rec){const comptee=rec.comptee||{};const ctrl=rec.control||{};let tc=0,tcol=0;
-  ROWS.forEach(r=>{tc+=comptee[r.key]||0;if(ctrl[r.key])tcol+=(ctrl[r.key].beta||0)+(ctrl[r.key].zelty||0);});
+  ROWS.forEach(r=>{if(!r.reconcile)return;tc+=comptee[r.key]||0;if(ctrl[r.key])tcol+=(ctrl[r.key].beta||0)+(ctrl[r.key].zelty||0);});
   const ecart=tc-tcol;return{comptee:tc,collecte:tcol,ecart,statut:statutFor(ecart).txt,espDepot:comptee.especes||0,hasControl:!!rec.control};}
 
 /* ---------- Contrôle : verrou + charger + enregistrer ---------- */
@@ -479,8 +488,8 @@ async function loadControl(){
   $('ctrlEmpty').style.display='none';$('ctrlGrid').style.display='grid';
   const comptee=rec.comptee||{};const ctrl=rec.control||{};
   ROWS.forEach(r=>{
-    if(!r.auto)$('cc_'+r.key).value=(comptee[r.key]!=null&&comptee[r.key]!==0)?comptee[r.key]:'';
-    const c=ctrl[r.key]||{};$('beta_'+r.key).value=c.beta||'';$('zelty_'+r.key).value=c.zelty||'';
+    if(r.ctype==='input')$('cc_'+r.key).value=(comptee[r.key]!=null&&comptee[r.key]!==0)?comptee[r.key]:'';
+    if(r.reconcile){const c=ctrl[r.key]||{};$('beta_'+r.key).value=c.beta||'';$('zelty_'+r.key).value=c.zelty||'';}
   });
   $('ctrlSavedNote').textContent=rec.control?'Contrôle existant chargé':'Caisse accueil chargée';
   computeControl();
@@ -490,8 +499,9 @@ $('saveCtrlBtn').addEventListener('click',async()=>{
   if(!rec){rec=await loadRecord(SALLE,date);}
   if(!rec||!rec.savedAt){toast('Aucune caisse à contrôler');return;}
   rec.comptee=rec.comptee||{};
-  ROWS.forEach(r=>{if(!r.auto)rec.comptee[r.key]=num('cc_'+r.key);});
-  rec.control={};ROWS.forEach(r=>rec.control[r.key]={beta:num('beta_'+r.key),zelty:num('zelty_'+r.key)});
+  ROWS.forEach(r=>{if(r.ctype==='input')rec.comptee[r.key]=num('cc_'+r.key);});
+  ROWS.forEach(r=>{if(r.ctype==='sum')rec.comptee[r.key]=r.sumOf.reduce((s,k)=>s+(rec.comptee[k]||0),0);});
+  rec.control={};ROWS.forEach(r=>{if(r.reconcile)rec.control[r.key]={beta:num('beta_'+r.key),zelty:num('zelty_'+r.key)};});
   rec.controlAt=new Date().toISOString();rec.totals=recomputeTotals(rec);
   currentRecord=rec;await putRecord(rec);
   $('ctrlSavedNote').textContent='Contrôle enregistré ✓ — '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
@@ -535,13 +545,17 @@ $('printBtn').addEventListener('click',()=>window.print());
 $('csvBtn').addEventListener('click',()=>{const r=computeSaisie();const d=$('dateJour').value;dl([['Salle',SALLE],['Date',d],[],['Especes',r.especes.toFixed(2)],['ANCV papier',r.ancv.toFixed(2)],['Erreur CB',r.erreur.toFixed(2)],['Total compte',(r.especes+r.ancv).toFixed(2)]],`caisse_${SALLE}_${d}.csv`);});
 
 function recapCtrl(){const r=computeControl();let t=`CONTRÔLE CAISSE — ${SALLE}\nDate : ${$('dateJour').value}\n\n`;
-  ROWS.forEach(x=>{const enc=num('beta_'+x.key)+num('zelty_'+x.key);const ec=(r.comptee[x.key]||0)-enc;t+=`${x.label} : comptée ${eur(r.comptee[x.key]||0)} | encaissé ${eur(enc)} | écart ${signEur(ec)}\n`;});
+  ROWS.forEach(x=>{const cm=r.comptee[x.key]||0;
+    if(x.reconcile){const enc=num('beta_'+x.key)+num('zelty_'+x.key);const ec=cm-enc;t+=`${x.label} : comptée ${eur(cm)} | encaissé ${eur(enc)} | écart ${signEur(ec)}\n`;}
+    else t+=`${x.label} : ${eur(cm)}\n`;});
   t+=`\nÉCART GLOBAL : ${signEur(r.ecart)} (${r.statut})`;return t;}
 $('copyCtrlBtn').addEventListener('click',()=>navigator.clipboard.writeText(recapCtrl()).then(()=>toast('Copié ✓')).catch(()=>toast('Copie impossible')));
 $('printCtrlBtn').addEventListener('click',()=>window.print());
 $('csvCtrlBtn').addEventListener('click',()=>{const r=computeControl();const d=$('dateJour').value;
   let rows=[['Salle',SALLE],['Date',d],[],['Type','Caisse comptee','BETA','ZELTY','Encaisse','Ecart']];
-  ROWS.forEach(x=>{const b=num('beta_'+x.key),z=num('zelty_'+x.key),enc=b+z,ec=(r.comptee[x.key]||0)-enc;rows.push([x.label,(r.comptee[x.key]||0).toFixed(2),b.toFixed(2),z.toFixed(2),enc.toFixed(2),ec.toFixed(2)]);});
+  ROWS.forEach(x=>{const cm=(r.comptee[x.key]||0);
+    if(x.reconcile){const b=num('beta_'+x.key),z=num('zelty_'+x.key),enc=b+z,ec=cm-enc;rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),enc.toFixed(2),ec.toFixed(2)]);}
+    else rows.push([x.label,cm.toFixed(2),'','','','']);});
   rows.push([]);rows.push(['Ecart global',r.ecart.toFixed(2)]);rows.push(['Statut',r.statut]);
   dl(rows,`controle_${SALLE}_${d}.csv`);});
 
