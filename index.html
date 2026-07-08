@@ -371,16 +371,16 @@ function buildCoffre(){const tb=$('coffreBody');ESPECES.forEach((v,i)=>{const tr
 buildCoffre();
 
 function buildCtrl(){const tb=$('ctrlBody');ROWS.forEach(r=>{
+  const isSum=r.ctype==='sum';
   const comptee=(r.ctype==='input')?`<input type="number" step="0.01" id="cc_${r.key}" placeholder="0,00">`:`<span class="mono" id="cc_${r.key}">0,00 €</span>`;
-  let rest;
-  if(r.reconcile){rest=`<td class="r"><input type="number" step="0.01" id="beta_${r.key}" placeholder="0,00"></td>
-    <td class="r"><input type="number" step="0.01" id="zelty_${r.key}" placeholder="0,00"></td>
-    <td class="r mono" id="enc_${r.key}">0,00 €</td><td class="r mono ecart-val" id="ec_${r.key}">0,00 €</td>
-    <td class="c"><span class="badge none" id="st_${r.key}">—</span></td>`;}
-  else{rest=`<td class="r" style="color:#c3bca6">–</td><td class="r" style="color:#c3bca6">–</td><td class="r" style="color:#c3bca6">–</td><td class="r" style="color:#c3bca6">–</td><td class="c" style="color:#c3bca6">–</td>`;}
+  const beta=isSum?`<span class="mono" id="beta_${r.key}">0,00 €</span>`:`<input type="number" step="0.01" id="beta_${r.key}" placeholder="0,00">`;
+  const zelty=isSum?`<span class="mono" id="zelty_${r.key}">0,00 €</span>`:`<input type="number" step="0.01" id="zelty_${r.key}" placeholder="0,00">`;
+  const tail=r.reconcile
+    ?`<td class="r mono" id="enc_${r.key}">0,00 €</td><td class="r mono ecart-val" id="ec_${r.key}">0,00 €</td><td class="c"><span class="badge none" id="st_${r.key}">—</span></td>`
+    :`<td class="r mono" id="enc_${r.key}">0,00 €</td><td class="r" style="color:#c3bca6">–</td><td class="c" style="color:#c3bca6">–</td>`;
   const lab=r.component?`<span style="color:var(--muted);font-weight:500">↳ ${r.label}</span>`:r.label;
-  const tr=document.createElement('tr');
-  tr.innerHTML=`<td class="type">${lab}</td><td class="r cc">${comptee}</td>${rest}`;tb.appendChild(tr);});}
+  const tr=document.createElement('tr');if(r.component)tr.style.background='rgba(202,166,74,.06)';
+  tr.innerHTML=`<td class="type">${lab}</td><td class="r cc">${comptee}</td><td class="r">${beta}</td><td class="r">${zelty}</td>${tail}`;tb.appendChild(tr);});}
 buildCtrl();
 
 /* ---------- Calcul SAISIE (espèces + ANCV + erreur CB) ---------- */
@@ -411,13 +411,17 @@ function ctrlComptee(){
   ROWS.forEach(r=>{if(r.ctype==='sum')c[r.key]=r.sumOf.reduce((s,k)=>s+(c[k]||0),0);});
   return c;
 }
+function rowBeta(r){return r.ctype==='sum'?r.sumOf.reduce((s,k)=>s+num('beta_'+k),0):num('beta_'+r.key);}
+function rowZelty(r){return r.ctype==='sum'?r.sumOf.reduce((s,k)=>s+num('zelty_'+k),0):num('zelty_'+r.key);}
 function computeControl(){
   const comptee=ctrlComptee();let tc=0,tcol=0,worst='ok';const ord={ok:0,warn:1,err:2,none:0};
-  ROWS.forEach(r=>{const c=comptee[r.key]||0;
+  ROWS.forEach(r=>{const c=comptee[r.key]||0;const beta=rowBeta(r),zelty=rowZelty(r),enc=beta+zelty;
     if(r.ctype!=='input')$('cc_'+r.key).textContent=eur(c);
+    if(r.ctype==='sum'){$('beta_'+r.key).textContent=eur(beta);$('zelty_'+r.key).textContent=eur(zelty);}
+    if($('enc_'+r.key))$('enc_'+r.key).textContent=eur(enc);
     if(!r.reconcile)return;
-    const enc=num('beta_'+r.key)+num('zelty_'+r.key);const ec=c-enc;tc+=c;tcol+=enc;
-    $('enc_'+r.key).textContent=eur(enc);const ecCell=$('ec_'+r.key);ecCell.textContent=signEur(ec);ecCell.classList.toggle('bad',Math.abs(ec)>=5);
+    const ec=c-enc;tc+=c;tcol+=enc;
+    const ecCell=$('ec_'+r.key);ecCell.textContent=signEur(ec);ecCell.classList.toggle('bad',Math.abs(ec)>=5);
     const s=statutFor(ec);const b=$('st_'+r.key);b.className='badge '+s.cls;b.textContent=s.txt;if(ord[s.cls]>ord[worst])worst=s.cls;});
   const ecart=tc-tcol;
   $('tComptee').textContent=eur(tc);$('tCollecte').textContent=eur(tcol);$('tEcart').textContent=signEur(ecart);
@@ -489,7 +493,7 @@ async function loadControl(){
   const comptee=rec.comptee||{};const ctrl=rec.control||{};
   ROWS.forEach(r=>{
     if(r.ctype==='input')$('cc_'+r.key).value=(comptee[r.key]!=null&&comptee[r.key]!==0)?comptee[r.key]:'';
-    if(r.reconcile){const c=ctrl[r.key]||{};$('beta_'+r.key).value=c.beta||'';$('zelty_'+r.key).value=c.zelty||'';}
+    if(r.ctype!=='sum'){const c=ctrl[r.key]||{};$('beta_'+r.key).value=c.beta||'';$('zelty_'+r.key).value=c.zelty||'';}
   });
   $('ctrlSavedNote').textContent=rec.control?'Contrôle existant chargé':'Caisse accueil chargée';
   computeControl();
@@ -501,7 +505,9 @@ $('saveCtrlBtn').addEventListener('click',async()=>{
   rec.comptee=rec.comptee||{};
   ROWS.forEach(r=>{if(r.ctype==='input')rec.comptee[r.key]=num('cc_'+r.key);});
   ROWS.forEach(r=>{if(r.ctype==='sum')rec.comptee[r.key]=r.sumOf.reduce((s,k)=>s+(rec.comptee[k]||0),0);});
-  rec.control={};ROWS.forEach(r=>{if(r.reconcile)rec.control[r.key]={beta:num('beta_'+r.key),zelty:num('zelty_'+r.key)};});
+  rec.control={};
+  ROWS.forEach(r=>{if(r.ctype!=='sum')rec.control[r.key]={beta:num('beta_'+r.key),zelty:num('zelty_'+r.key)};});
+  ROWS.forEach(r=>{if(r.ctype==='sum')rec.control[r.key]={beta:r.sumOf.reduce((s,k)=>s+(rec.control[k]?rec.control[k].beta:0),0),zelty:r.sumOf.reduce((s,k)=>s+(rec.control[k]?rec.control[k].zelty:0),0)};});
   rec.controlAt=new Date().toISOString();rec.totals=recomputeTotals(rec);
   currentRecord=rec;await putRecord(rec);
   $('ctrlSavedNote').textContent='Contrôle enregistré ✓ — '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
@@ -554,17 +560,17 @@ $('printBtn').addEventListener('click',()=>window.print());
 $('csvBtn').addEventListener('click',()=>{const r=computeSaisie();const d=$('dateJour').value;dl([['Salle',SALLE],['Date',d],[],['Especes',r.especes.toFixed(2)],['ANCV papier',r.ancv.toFixed(2)],['Erreur CB',r.erreur.toFixed(2)],['Total compte',(r.especes+r.ancv).toFixed(2)]],`caisse_${SALLE}_${d}.csv`);});
 
 function recapCtrl(){const r=computeControl();let t=`CONTRÔLE CAISSE — ${SALLE}\nDate : ${$('dateJour').value}\n\n`;
-  ROWS.forEach(x=>{const cm=r.comptee[x.key]||0;
-    if(x.reconcile){const enc=num('beta_'+x.key)+num('zelty_'+x.key);const ec=cm-enc;t+=`${x.label} : comptée ${eur(cm)} | encaissé ${eur(enc)} | écart ${signEur(ec)}\n`;}
-    else t+=`${x.label} : ${eur(cm)}\n`;});
+  ROWS.forEach(x=>{const cm=r.comptee[x.key]||0;const b=rowBeta(x),z=rowZelty(x);
+    if(x.reconcile){const enc=b+z;const ec=cm-enc;t+=`${x.label} : comptée ${eur(cm)} | encaissé ${eur(enc)} | écart ${signEur(ec)}\n`;}
+    else t+=`${x.label} : comptée ${eur(cm)} | BETA ${eur(b)} | ZELTY ${eur(z)}\n`;});
   t+=`\nÉCART GLOBAL : ${signEur(r.ecart)} (${r.statut})`;return t;}
 $('copyCtrlBtn').addEventListener('click',()=>navigator.clipboard.writeText(recapCtrl()).then(()=>toast('Copié ✓')).catch(()=>toast('Copie impossible')));
 $('printCtrlBtn').addEventListener('click',()=>window.print());
 $('csvCtrlBtn').addEventListener('click',()=>{const r=computeControl();const d=$('dateJour').value;
   let rows=[['Salle',SALLE],['Date',d],[],['Type','Caisse comptee','BETA','ZELTY','Encaisse','Ecart']];
-  ROWS.forEach(x=>{const cm=(r.comptee[x.key]||0);
-    if(x.reconcile){const b=num('beta_'+x.key),z=num('zelty_'+x.key),enc=b+z,ec=cm-enc;rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),enc.toFixed(2),ec.toFixed(2)]);}
-    else rows.push([x.label,cm.toFixed(2),'','','','']);});
+  ROWS.forEach(x=>{const cm=(r.comptee[x.key]||0);const b=rowBeta(x),z=rowZelty(x);
+    if(x.reconcile){const enc=b+z,ec=cm-enc;rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),enc.toFixed(2),ec.toFixed(2)]);}
+    else rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),'','']);});
   rows.push([]);rows.push(['Ecart global',r.ecart.toFixed(2)]);rows.push(['Statut',r.statut]);
   dl(rows,`controle_${SALLE}_${d}.csv`);});
 
