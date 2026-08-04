@@ -243,6 +243,11 @@
               </table>
             </div>
           </div>
+          <div class="card">
+            <h2 class="bo"><span class="dot"></span>Commentaire</h2>
+            <p class="hint">Note libre du back office sur ce contrôle (facultatif).</p>
+            <textarea id="ctrlComment" rows="3" placeholder="Ex. écart CB dû à un remboursement client, à revoir avec…" style="width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:11px;font-family:'Instrument Sans',sans-serif;font-size:14px;background:#fff;resize:vertical;color:var(--ink)"></textarea>
+          </div>
         </div>
         <aside class="summary bo">
           <div class="card">
@@ -496,6 +501,7 @@ async function loadControl(){
     if(r.ctype!=='sum'){const c=ctrl[r.key]||{};$('beta_'+r.key).value=c.beta||'';$('zelty_'+r.key).value=c.zelty||'';}
   });
   $('ctrlSavedNote').textContent=rec.control?'Contrôle existant chargé':'Caisse accueil chargée';
+  $('ctrlComment').value=rec.comment||'';
   computeControl();
 }
 $('saveCtrlBtn').addEventListener('click',async()=>{
@@ -508,7 +514,7 @@ $('saveCtrlBtn').addEventListener('click',async()=>{
   rec.control={};
   ROWS.forEach(r=>{if(r.ctype!=='sum')rec.control[r.key]={beta:num('beta_'+r.key),zelty:num('zelty_'+r.key)};});
   ROWS.forEach(r=>{if(r.ctype==='sum')rec.control[r.key]={beta:r.sumOf.reduce((s,k)=>s+(rec.control[k]?rec.control[k].beta:0),0),zelty:r.sumOf.reduce((s,k)=>s+(rec.control[k]?rec.control[k].zelty:0),0)};});
-  rec.controlAt=new Date().toISOString();rec.totals=recomputeTotals(rec);
+  rec.controlAt=new Date().toISOString();rec.comment=$('ctrlComment').value.trim();rec.totals=recomputeTotals(rec);
   currentRecord=rec;await putRecord(rec);
   $('ctrlSavedNote').textContent='Contrôle enregistré ✓ — '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   toast(`Contrôle ${SALLE} du ${date} enregistré ✓`);
@@ -563,7 +569,9 @@ function recapCtrl(){const r=computeControl();let t=`CONTRÔLE CAISSE — ${SALL
   ROWS.forEach(x=>{const cm=r.comptee[x.key]||0;const b=rowBeta(x),z=rowZelty(x);
     if(x.reconcile){const enc=b+z;const ec=cm-enc;t+=`${x.label} : comptée ${eur(cm)} | encaissé ${eur(enc)} | écart ${signEur(ec)}\n`;}
     else t+=`${x.label} : comptée ${eur(cm)} | BETA ${eur(b)} | ZELTY ${eur(z)}\n`;});
-  t+=`\nÉCART GLOBAL : ${signEur(r.ecart)} (${r.statut})`;return t;}
+  t+=`\nÉCART GLOBAL : ${signEur(r.ecart)} (${r.statut})`;
+  const cmt=$('ctrlComment').value.trim();if(cmt)t+=`\n\nCommentaire : ${cmt}`;
+  return t;}
 $('copyCtrlBtn').addEventListener('click',()=>navigator.clipboard.writeText(recapCtrl()).then(()=>toast('Copié ✓')).catch(()=>toast('Copie impossible')));
 $('printCtrlBtn').addEventListener('click',()=>window.print());
 $('csvCtrlBtn').addEventListener('click',()=>{const r=computeControl();const d=$('dateJour').value;
@@ -571,7 +579,7 @@ $('csvCtrlBtn').addEventListener('click',()=>{const r=computeControl();const d=$
   ROWS.forEach(x=>{const cm=(r.comptee[x.key]||0);const b=rowBeta(x),z=rowZelty(x);
     if(x.reconcile){const enc=b+z,ec=cm-enc;rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),enc.toFixed(2),ec.toFixed(2)]);}
     else rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),'','']);});
-  rows.push([]);rows.push(['Ecart global',r.ecart.toFixed(2)]);rows.push(['Statut',r.statut]);
+  rows.push([]);rows.push(['Ecart global',r.ecart.toFixed(2)]);rows.push(['Statut',r.statut]);rows.push(['Commentaire',$('ctrlComment').value.trim()]);
   dl(rows,`controle_${SALLE}_${d}.csv`);});
 
 computeSaisie();
