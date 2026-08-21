@@ -392,18 +392,19 @@ buildCtrl();
 function computeSaisie(){
   let totEsp=0,totOut=0,totIn=0;
   ESPECES.forEach((v,i)=>{const qty=parseInt($('e'+i).value)||0;const m=qty*v;totEsp+=m;
-    const c=$('em'+i);c.textContent=eur(m);c.classList.toggle('zero',m===0);
+    const c=$('em'+i);if(c){c.textContent=eur(m);c.classList.toggle('zero',m===0);}
     const target=FOND_QTE[i];const out=Math.max(0,qty-target),inn=Math.max(0,target-qty);totOut+=out*v;totIn+=inn*v;
-    $('cf_cnt'+i).textContent=qty;
-    const co=$('cf_out'+i);co.textContent=out>0?out:'–';co.style.color=out>0?'var(--accent-2)':'#c3bca6';
-    const ci=$('cf_in'+i);ci.textContent=inn>0?inn:'–';ci.style.color=inn>0?'var(--danger)':'#c3bca6';});
-  $('cfTotOut').textContent=eur(totOut);$('cfTotIn').textContent=eur(totIn);
-  let totAncv=0;ANCV.forEach((v,i)=>{const m=(parseInt($('a'+i).value)||0)*v;totAncv+=m;const c=$('am'+i);c.textContent=eur(m);c.classList.toggle('zero',m===0);});
+    const cnt=$('cf_cnt'+i);if(cnt)cnt.textContent=qty;
+    const co=$('cf_out'+i);if(co){co.textContent=out>0?out:'–';co.style.color=out>0?'var(--accent-2)':'#c3bca6';}
+    const ci=$('cf_in'+i);if(ci){ci.textContent=inn>0?inn:'–';ci.style.color=inn>0?'var(--danger)':'#c3bca6';}});
+  const set=(id,val)=>{const el=$(id);if(el)el.textContent=val;};
+  set('cfTotOut',eur(totOut));set('cfTotIn',eur(totIn));
+  let totAncv=0;ANCV.forEach((v,i)=>{const m=(parseInt($('a'+i).value)||0)*v;totAncv+=m;const c=$('am'+i);if(c){c.textContent=eur(m);c.classList.toggle('zero',m===0);}});
   const erreur=num('erreurCB');
   const espComptee=totEsp-FOND_DE_CAISSE-erreur;
-  $('totalEspeces').textContent=eur(totEsp);$('totalAncv').textContent=eur(totAncv);
-  $('rEspeces').textContent=eur(espComptee);$('rAncv').textContent=eur(totAncv);
-  $('sComptee').textContent=eur(espComptee+totAncv);$('sEspDepot').textContent=eur(espComptee);
+  set('totalEspeces',eur(totEsp));set('totalAncv',eur(totAncv));
+  set('rEspeces',eur(espComptee));set('rAncv',eur(totAncv));
+  set('sComptee',eur(espComptee+totAncv));set('sEspDepot',eur(espComptee));
   return {totEsp,totAncv,erreur,especes:espComptee,ancv:totAncv};
 }
 
