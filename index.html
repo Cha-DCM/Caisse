@@ -111,6 +111,14 @@
   .arch-row .a-date{font-family:'DM Mono';font-weight:500;font-size:14px;min-width:118px;text-transform:capitalize}
   .arch-row .a-tot{font-family:'DM Mono';font-size:12.5px;color:var(--muted)}
   .arch-row .a-spacer{flex:1}
+  .arch-row .a-cmt{flex-basis:100%;font-size:13px;color:var(--ink);background:#fff;border-left:3px solid var(--bo);border-radius:6px;padding:7px 10px;white-space:pre-wrap}
+  .rf-row{display:flex;gap:8px;align-items:center;padding:6px 0;flex-wrap:wrap}
+  .rf-row input{padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;background:#fff;font-size:14px}
+  .rf-row input:focus{outline:none;border-color:var(--bo);box-shadow:0 0 0 3px rgba(58,91,160,.14)}
+  .rf-row .rf-amt{width:110px;font-family:'DM Mono';text-align:right}
+  .rf-row .rf-motif{flex:1;min-width:160px;font-family:'Instrument Sans'}
+  .rf-row .rf-del{border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:7px 10px;cursor:pointer;color:var(--muted)}
+  .rf-row .rf-del:hover{border-color:var(--danger);color:var(--danger)}
   .arch-row button{border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ink);transition:.15s}
   .arch-row button:hover{border-color:var(--accent);color:var(--accent)}
   .arch-row button.del:hover{border-color:var(--danger);color:var(--danger)}
@@ -239,9 +247,20 @@
               <table class="ctrl">
                 <thead><tr><th>Type</th><th class="r">Caisse comptée</th><th class="r">BETA</th><th class="r">ZELTY</th><th class="r">Encaissé</th><th class="r">Écart</th><th class="c">Statut</th></tr></thead>
                 <tbody id="ctrlBody"></tbody>
-                <tfoot><tr><td>Totaux</td><td class="r mono" id="tComptee">0,00 €</td><td colspan="2" class="r mono" id="tCollecte">0,00 €</td><td></td><td class="r mono" id="tEcart">0,00 €</td><td class="c" id="tStatut"></td></tr></tfoot>
+                <tfoot>
+                  <tr><td>Total caisse comptée</td><td class="r mono" id="tCompteeBrut">0,00 €</td><td colspan="5"></td></tr>
+                  <tr><td>+ Total remboursé</td><td class="r mono" id="tRemb">0,00 €</td><td colspan="5"></td></tr>
+                  <tr><td>Total global</td><td class="r mono" id="tComptee">0,00 €</td><td colspan="2" class="r mono" id="tCollecte">0,00 €</td><td></td><td class="r mono" id="tEcart">0,00 €</td><td class="c" id="tStatut"></td></tr>
+                </tfoot>
               </table>
             </div>
+          </div>
+          <div class="card">
+            <h2 class="bo"><span class="dot"></span>Remboursements</h2>
+            <p class="hint">Remboursements faits aux clients ce jour-là (sortis de la caisse). Ils s'ajoutent à la caisse comptée pour calculer le total global.</p>
+            <div id="refundList"></div>
+            <button class="mini-btn" id="addRefundBtn" type="button" style="margin:6px 0 4px">+ Ajouter un remboursement</button>
+            <div class="field-row"><label><strong>Total remboursé</strong></label><span class="mono" id="refundTotal" style="font-weight:600">0,00 €</span></div>
           </div>
           <div class="card">
             <h2 class="bo"><span class="dot"></span>Commentaire</h2>
@@ -253,6 +272,8 @@
           <div class="card">
             <h2 style="color:#fff"><span class="dot" style="background:var(--bo)"></span>Résultat du contrôle</h2>
             <div class="sum-line"><span class="lbl">Total caisse comptée</span><span class="val" id="rComptee">0,00 €</span></div>
+            <div class="sum-line"><span class="lbl">+ Total remboursé</span><span class="val" id="rRemb">0,00 €</span></div>
+            <div class="sum-line"><span class="lbl">Total global</span><span class="val" id="rGlobal">0,00 €</span></div>
             <div class="sum-line"><span class="lbl">Total collecté</span><span class="val" id="rCollecte">0,00 €</span></div>
             <div class="sum-ecart ok" id="ecartBox"><span class="t-lbl">Écart global</span><span class="t-val" id="ecartGlobal">0,00 €</span><span class="t-st" id="statutGlobal">✓ Aucun écart</span></div>
             <button class="save-btn" id="saveCtrlBtn">💾 Enregistrer le contrôle</button>
@@ -429,14 +450,36 @@ function computeControl(){
     const ec=c-enc;tc+=c;tcol+=enc;
     const ecCell=$('ec_'+r.key);ecCell.textContent=signEur(ec);ecCell.classList.toggle('bad',Math.abs(ec)>=5);
     const s=statutFor(ec);const b=$('st_'+r.key);b.className='badge '+s.cls;b.textContent=s.txt;if(ord[s.cls]>ord[worst])worst=s.cls;});
-  const ecart=tc-tcol;
-  $('tComptee').textContent=eur(tc);$('tCollecte').textContent=eur(tcol);$('tEcart').textContent=signEur(ecart);
+  const remb=refundTotal(getRefunds());const glob=tc+remb;
+  const ecart=glob-tcol;
+  const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};
+  set('tCompteeBrut',eur(tc));set('tRemb',eur(remb));set('refundTotal',eur(remb));
+  set('tComptee',eur(glob));set('tCollecte',eur(tcol));set('tEcart',signEur(ecart));
   const sg=statutFor(ecart);$('tStatut').innerHTML=`<span class="badge ${sg.cls}">${sg.txt}</span>`;
-  $('rComptee').textContent=eur(tc);$('rCollecte').textContent=eur(tcol);$('ecartGlobal').textContent=signEur(ecart);
-  $('ecartBox').className='sum-ecart '+worst;
-  $('statutGlobal').textContent=worst==='ok'?'✓ Aucun écart':worst==='warn'?'⚠ Écart mineur à vérifier':'✕ Écart important !';
-  return {comptee,tc,tcol,ecart,statut:sg.txt};
+  set('rComptee',eur(tc));set('rRemb',eur(remb));set('rGlobal',eur(glob));set('rCollecte',eur(tcol));set('ecartGlobal',signEur(ecart));
+  // Sans remboursement : statut = pire ligne (comportement d'origine). Avec remboursement : statut de l'écart global corrigé.
+  const boxCls=remb>0?sg.cls:worst;
+  $('ecartBox').className='sum-ecart '+boxCls;
+  $('statutGlobal').textContent=boxCls==='ok'?'✓ Aucun écart':boxCls==='warn'?'⚠ Écart mineur à vérifier':'✕ Écart important !';
+  return {comptee,tc,tcol,remb,glob,ecart,statut:sg.txt};
 }
+
+/* ---------- Remboursements ---------- */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function addRefundRow(montant,motif){
+  const row=document.createElement('div');row.className='rf-row';
+  row.innerHTML=`<input type="number" step="0.01" min="0" class="rf-amt" placeholder="0,00 €"><input type="text" class="rf-motif" placeholder="Motif (ex. séance annulée, client X…)"><button type="button" class="rf-del" title="Retirer">✕</button>`;
+  row.querySelector('.rf-amt').value=montant?montant:'';row.querySelector('.rf-motif').value=motif||'';
+  row.querySelector('.rf-del').addEventListener('click',()=>{row.remove();if(!$('refundList').children.length)addRefundRow();computeControl();});
+  $('refundList').appendChild(row);
+}
+function getRefunds(){const out=[];document.querySelectorAll('#refundList .rf-row').forEach(r=>{
+  const m=parseFloat(r.querySelector('.rf-amt').value)||0;const motif=r.querySelector('.rf-motif').value.trim();
+  if(m!==0||motif)out.push({montant:m,motif});});return out;}
+function refundTotal(list){return (list||[]).reduce((s,x)=>s+(Number(x.montant)||0),0);}
+function fillRefunds(list){$('refundList').innerHTML='';(list&&list.length?list:[{}]).forEach(x=>addRefundRow(x.montant,x.motif));}
+$('addRefundBtn').addEventListener('click',()=>{addRefundRow();const rows=document.querySelectorAll('#refundList .rf-amt');rows[rows.length-1].focus();});
+fillRefunds([]);
 
 document.addEventListener('input',e=>{if(!e.target.matches('input'))return;
   if($('saisieView').contains(e.target))computeSaisie();
@@ -483,7 +526,8 @@ $('saveBtn').addEventListener('click',async()=>{
 
 function recomputeTotals(rec){const comptee=rec.comptee||{};const ctrl=rec.control||{};let tc=0,tcol=0;
   ROWS.forEach(r=>{if(!r.reconcile)return;tc+=comptee[r.key]||0;if(ctrl[r.key])tcol+=(ctrl[r.key].beta||0)+(ctrl[r.key].zelty||0);});
-  const ecart=tc-tcol;return{comptee:tc,collecte:tcol,ecart,statut:statutFor(ecart).txt,espDepot:comptee.especes||0,hasControl:!!rec.control};}
+  const remb=refundTotal(rec.refunds); // anciennes caisses : pas de remboursements → 0
+  const ecart=tc+remb-tcol;return{comptee:tc,rembourse:remb,global:tc+remb,collecte:tcol,ecart,statut:statutFor(ecart).txt,espDepot:comptee.especes||0,hasControl:!!rec.control};}
 
 /* ---------- Contrôle : verrou + charger + enregistrer ---------- */
 function tryCtrlUnlock(){if($('ctrlPwd').value===MDP_CONTROLE){controlUnlocked=true;$('ctrlLock').style.display='none';$('ctrlContent').style.display='block';loadControl();}
@@ -503,6 +547,7 @@ async function loadControl(){
   });
   $('ctrlSavedNote').textContent=rec.control?'Contrôle existant chargé':'Caisse accueil chargée';
   $('ctrlComment').value=rec.comment||'';
+  fillRefunds(rec.refunds||[]);
   computeControl();
 }
 $('saveCtrlBtn').addEventListener('click',async()=>{
@@ -515,7 +560,7 @@ $('saveCtrlBtn').addEventListener('click',async()=>{
   rec.control={};
   ROWS.forEach(r=>{if(r.ctype!=='sum')rec.control[r.key]={beta:num('beta_'+r.key),zelty:num('zelty_'+r.key)};});
   ROWS.forEach(r=>{if(r.ctype==='sum')rec.control[r.key]={beta:r.sumOf.reduce((s,k)=>s+(rec.control[k]?rec.control[k].beta:0),0),zelty:r.sumOf.reduce((s,k)=>s+(rec.control[k]?rec.control[k].zelty:0),0)};});
-  rec.controlAt=new Date().toISOString();rec.comment=$('ctrlComment').value.trim();rec.totals=recomputeTotals(rec);
+  rec.controlAt=new Date().toISOString();rec.comment=$('ctrlComment').value.trim();rec.refunds=getRefunds();rec.totals=recomputeTotals(rec);
   currentRecord=rec;await putRecord(rec);
   $('ctrlSavedNote').textContent='Contrôle enregistré ✓ — '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   toast(`Contrôle ${SALLE} du ${date} enregistré ✓`);
@@ -549,10 +594,13 @@ async function renderArchives(){
   recs.forEach(rec=>{const t=rec.totals||{};const hasCtrl=t.hasControl;
     const a=Math.abs(t.ecart||0);const cls=!hasCtrl?'none':a<0.01?'ok':a<5?'warn':'err';const txt=!hasCtrl?'à contrôler':a<0.01?'OK':a<5?'⚠':'ÉCART';
     const d=new Date(rec.date).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short'});
+    const remb=refundTotal(rec.refunds);
+    const cmt=(rec.comment||'').trim();
     const row=document.createElement('div');row.className='arch-row';
     row.innerHTML=`<span class="a-date">${d}</span><span class="badge ${cls}">${txt}</span>
-      <span class="a-tot">comptée ${eur(t.comptee||0)}${hasCtrl?' · écart '+signEur(t.ecart||0):''}</span>
-      <span class="a-spacer"></span><button data-load="${rec.date}">Ouvrir la saisie</button><button class="del" data-del="${rec.date}">🗑</button>`;
+      <span class="a-tot">comptée ${eur(t.comptee||0)}${remb?' · remboursé '+eur(remb):''}${hasCtrl?' · écart '+signEur(t.ecart||0):''}</span>
+      <span class="a-spacer"></span><button data-load="${rec.date}">Ouvrir la saisie</button><button class="del" data-del="${rec.date}">🗑</button>
+      ${cmt?`<div class="a-cmt">💬 ${esc(cmt)}</div>`:''}`;
     list.appendChild(row);});
   list.querySelectorAll('[data-load]').forEach(b=>b.addEventListener('click',async()=>{$('dateJour').value=b.dataset.load;switchView('saisie');await loadSaisie();}));
   list.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',async()=>{if(confirm('Supprimer cette caisse archivée ? (retirée aussi du Google Sheet)')){await Store.del(keyFor(SALLE,b.dataset.del));deleteRemote(SALLE,b.dataset.del);renderArchives();toast('Caisse supprimée');}}));
@@ -570,6 +618,9 @@ function recapCtrl(){const r=computeControl();let t=`CONTRÔLE CAISSE — ${SALL
   ROWS.forEach(x=>{const cm=r.comptee[x.key]||0;const b=rowBeta(x),z=rowZelty(x);
     if(x.reconcile){const enc=b+z;const ec=cm-enc;t+=`${x.label} : comptée ${eur(cm)} | encaissé ${eur(enc)} | écart ${signEur(ec)}\n`;}
     else t+=`${x.label} : comptée ${eur(cm)} | BETA ${eur(b)} | ZELTY ${eur(z)}\n`;});
+  t+=`\nTotal caisse comptée : ${eur(r.tc)}\n`;
+  getRefunds().forEach(x=>{t+=`  Remboursement : ${eur(x.montant)}${x.motif?' — '+x.motif:''}\n`;});
+  t+=`Total remboursé : ${eur(r.remb)}\nTotal global : ${eur(r.glob)}\nTotal collecté : ${eur(r.tcol)}\n`;
   t+=`\nÉCART GLOBAL : ${signEur(r.ecart)} (${r.statut})`;
   const cmt=$('ctrlComment').value.trim();if(cmt)t+=`\n\nCommentaire : ${cmt}`;
   return t;}
@@ -580,7 +631,10 @@ $('csvCtrlBtn').addEventListener('click',()=>{const r=computeControl();const d=$
   ROWS.forEach(x=>{const cm=(r.comptee[x.key]||0);const b=rowBeta(x),z=rowZelty(x);
     if(x.reconcile){const enc=b+z,ec=cm-enc;rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),enc.toFixed(2),ec.toFixed(2)]);}
     else rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),'','']);});
-  rows.push([]);rows.push(['Ecart global',r.ecart.toFixed(2)]);rows.push(['Statut',r.statut]);rows.push(['Commentaire',$('ctrlComment').value.trim()]);
+  rows.push([]);rows.push(['Total caisse comptee',r.tc.toFixed(2)]);
+  getRefunds().forEach(x=>rows.push(['Remboursement',(Number(x.montant)||0).toFixed(2),(x.motif||'').replace(/;/g,',')]));
+  rows.push(['Total rembourse',r.remb.toFixed(2)]);rows.push(['Total global',r.glob.toFixed(2)]);rows.push(['Total collecte',r.tcol.toFixed(2)]);
+  rows.push(['Ecart global',r.ecart.toFixed(2)]);rows.push(['Statut',r.statut]);rows.push(['Commentaire',$('ctrlComment').value.trim().replace(/;/g,',').replace(/\n/g,' ')]);
   dl(rows,`controle_${SALLE}_${d}.csv`);});
 
 computeSaisie();
