@@ -119,6 +119,8 @@
   .rf-row .rf-motif{flex:1;min-width:160px;font-family:'Instrument Sans'}
   .rf-row .rf-del{border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:7px 10px;cursor:pointer;color:var(--muted)}
   .rf-row .rf-del:hover{border-color:var(--danger);color:var(--danger)}
+  .rf-row .rf-mode{padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;background:#fff;font-size:14px;font-family:'Instrument Sans';color:var(--ink)}
+  .rf-row .rf-mode:focus{outline:none;border-color:var(--bo);box-shadow:0 0 0 3px rgba(58,91,160,.14)}
   .arch-row button{border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ink);transition:.15s}
   .arch-row button:hover{border-color:var(--accent);color:var(--accent)}
   .arch-row button.del:hover{border-color:var(--danger);color:var(--danger)}
@@ -250,6 +252,7 @@
                 <tfoot>
                   <tr><td>Total caisse comptée</td><td class="r mono" id="tCompteeBrut">0,00 €</td><td colspan="5"></td></tr>
                   <tr><td>+ Total remboursé</td><td class="r mono" id="tRemb">0,00 €</td><td colspan="5"></td></tr>
+                  <tr><td>+ Total impayés</td><td class="r mono" id="tImp">0,00 €</td><td colspan="5" style="color:var(--muted);font-weight:400;font-size:12px" id="tImpDetail"></td></tr>
                   <tr><td>Total global</td><td class="r mono" id="tComptee">0,00 €</td><td colspan="2" class="r mono" id="tCollecte">0,00 €</td><td></td><td class="r mono" id="tEcart">0,00 €</td><td class="c" id="tStatut"></td></tr>
                 </tfoot>
               </table>
@@ -263,6 +266,15 @@
             <div class="field-row"><label><strong>Total remboursé</strong></label><span class="mono" id="refundTotal" style="font-weight:600">0,00 €</span></div>
           </div>
           <div class="card">
+            <h2 class="bo"><span class="dot"></span>Impayés</h2>
+            <p class="hint">Ventes non encaissées ce jour-là, avec le mode de paiement prévu. Elles s'ajoutent à la caisse comptée pour calculer le total global.</p>
+            <div id="unpaidList"></div>
+            <button class="mini-btn" id="addUnpaidBtn" type="button" style="margin:6px 0 4px">+ Ajouter un impayé</button>
+            <div class="field-row"><label>dont CB</label><span class="mono" id="unpaidCB">0,00 €</span></div>
+            <div class="field-row"><label>dont Espèces</label><span class="mono" id="unpaidEsp">0,00 €</span></div>
+            <div class="field-row"><label><strong>Total impayés</strong></label><span class="mono" id="unpaidTotal" style="font-weight:600">0,00 €</span></div>
+          </div>
+          <div class="card">
             <h2 class="bo"><span class="dot"></span>Commentaire</h2>
             <p class="hint">Note libre du back office sur ce contrôle (facultatif).</p>
             <textarea id="ctrlComment" rows="3" placeholder="Ex. écart CB dû à un remboursement client, à revoir avec…" style="width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:11px;font-family:'Instrument Sans',sans-serif;font-size:14px;background:#fff;resize:vertical;color:var(--ink)"></textarea>
@@ -273,6 +285,7 @@
             <h2 style="color:#fff"><span class="dot" style="background:var(--bo)"></span>Résultat du contrôle</h2>
             <div class="sum-line"><span class="lbl">Total caisse comptée</span><span class="val" id="rComptee">0,00 €</span></div>
             <div class="sum-line"><span class="lbl">+ Total remboursé</span><span class="val" id="rRemb">0,00 €</span></div>
+            <div class="sum-line"><span class="lbl">+ Total impayés</span><span class="val" id="rImp">0,00 €</span></div>
             <div class="sum-line"><span class="lbl">Total global</span><span class="val" id="rGlobal">0,00 €</span></div>
             <div class="sum-line"><span class="lbl">Total collecté</span><span class="val" id="rCollecte">0,00 €</span></div>
             <div class="sum-ecart ok" id="ecartBox"><span class="t-lbl">Écart global</span><span class="t-val" id="ecartGlobal">0,00 €</span><span class="t-st" id="statutGlobal">✓ Aucun écart</span></div>
@@ -450,19 +463,43 @@ function computeControl(){
     const ec=c-enc;tc+=c;tcol+=enc;
     const ecCell=$('ec_'+r.key);ecCell.textContent=signEur(ec);ecCell.classList.toggle('bad',Math.abs(ec)>=5);
     const s=statutFor(ec);const b=$('st_'+r.key);b.className='badge '+s.cls;b.textContent=s.txt;if(ord[s.cls]>ord[worst])worst=s.cls;});
-  const remb=refundTotal(getRefunds());const glob=tc+remb;
+  const remb=refundTotal(getRefunds());
+  const unp=getUnpaids();const imp=unpaidTotal(unp),impCB=unpaidTotal(unp,'CB'),impEsp=unpaidTotal(unp,'Espèces');
+  const glob=tc+remb+imp;
   const ecart=glob-tcol;
   const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};
   set('tCompteeBrut',eur(tc));set('tRemb',eur(remb));set('refundTotal',eur(remb));
+  set('tImp',eur(imp));set('unpaidTotal',eur(imp));set('unpaidCB',eur(impCB));set('unpaidEsp',eur(impEsp));
+  set('tImpDetail',imp?`dont CB ${eur(impCB)} · Espèces ${eur(impEsp)}`:'');
   set('tComptee',eur(glob));set('tCollecte',eur(tcol));set('tEcart',signEur(ecart));
   const sg=statutFor(ecart);$('tStatut').innerHTML=`<span class="badge ${sg.cls}">${sg.txt}</span>`;
-  set('rComptee',eur(tc));set('rRemb',eur(remb));set('rGlobal',eur(glob));set('rCollecte',eur(tcol));set('ecartGlobal',signEur(ecart));
-  // Sans remboursement : statut = pire ligne (comportement d'origine). Avec remboursement : statut de l'écart global corrigé.
-  const boxCls=remb>0?sg.cls:worst;
+  set('rComptee',eur(tc));set('rRemb',eur(remb));set('rImp',eur(imp));set('rGlobal',eur(glob));set('rCollecte',eur(tcol));set('ecartGlobal',signEur(ecart));
+  // Sans remboursement ni impayé : statut = pire ligne (comportement d'origine). Sinon : statut de l'écart global corrigé.
+  const boxCls=(remb>0||imp>0)?sg.cls:worst;
   $('ecartBox').className='sum-ecart '+boxCls;
   $('statutGlobal').textContent=boxCls==='ok'?'✓ Aucun écart':boxCls==='warn'?'⚠ Écart mineur à vérifier':'✕ Écart important !';
-  return {comptee,tc,tcol,remb,glob,ecart,statut:sg.txt};
+  return {comptee,tc,tcol,remb,imp,impCB,impEsp,glob,ecart,statut:sg.txt};
 }
+
+/* ---------- Impayés ---------- */
+const UNPAID_MODES=['CB','Espèces'];
+function addUnpaidRow(montant,mode,motif){
+  const row=document.createElement('div');row.className='rf-row';
+  row.innerHTML=`<input type="number" step="0.01" min="0" class="rf-amt" placeholder="0,00 €"><select class="rf-mode">${UNPAID_MODES.map(m=>`<option value="${m}">${m}</option>`).join('')}</select><input type="text" class="rf-motif" placeholder="Client / motif (ex. oubli de paiement…)"><button type="button" class="rf-del" title="Retirer">✕</button>`;
+  row.querySelector('.rf-amt').value=montant?montant:'';
+  row.querySelector('.rf-mode').value=UNPAID_MODES.includes(mode)?mode:'CB';
+  row.querySelector('.rf-motif').value=motif||'';
+  row.querySelector('.rf-mode').addEventListener('change',computeControl);
+  row.querySelector('.rf-del').addEventListener('click',()=>{row.remove();if(!$('unpaidList').children.length)addUnpaidRow();computeControl();});
+  $('unpaidList').appendChild(row);
+}
+function getUnpaids(){const out=[];document.querySelectorAll('#unpaidList .rf-row').forEach(r=>{
+  const m=parseFloat(r.querySelector('.rf-amt').value)||0;const mode=r.querySelector('.rf-mode').value;const motif=r.querySelector('.rf-motif').value.trim();
+  if(m!==0||motif)out.push({montant:m,mode,motif});});return out;}
+function unpaidTotal(list,mode){return (list||[]).reduce((s,x)=>s+((!mode||x.mode===mode)?(Number(x.montant)||0):0),0);}
+function fillUnpaids(list){$('unpaidList').innerHTML='';(list&&list.length?list:[{}]).forEach(x=>addUnpaidRow(x.montant,x.mode,x.motif));}
+$('addUnpaidBtn').addEventListener('click',()=>{addUnpaidRow();const rows=document.querySelectorAll('#unpaidList .rf-amt');rows[rows.length-1].focus();});
+fillUnpaids([]);
 
 /* ---------- Remboursements ---------- */
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -527,7 +564,8 @@ $('saveBtn').addEventListener('click',async()=>{
 function recomputeTotals(rec){const comptee=rec.comptee||{};const ctrl=rec.control||{};let tc=0,tcol=0;
   ROWS.forEach(r=>{if(!r.reconcile)return;tc+=comptee[r.key]||0;if(ctrl[r.key])tcol+=(ctrl[r.key].beta||0)+(ctrl[r.key].zelty||0);});
   const remb=refundTotal(rec.refunds); // anciennes caisses : pas de remboursements → 0
-  const ecart=tc+remb-tcol;return{comptee:tc,rembourse:remb,global:tc+remb,collecte:tcol,ecart,statut:statutFor(ecart).txt,espDepot:comptee.especes||0,hasControl:!!rec.control};}
+  const imp=unpaidTotal(rec.unpaids),impCB=unpaidTotal(rec.unpaids,'CB'),impEsp=unpaidTotal(rec.unpaids,'Espèces'); // anciennes caisses : pas d'impayés → 0
+  const ecart=tc+remb+imp-tcol;return{comptee:tc,rembourse:remb,impayes:imp,impayesCB:impCB,impayesEsp:impEsp,global:tc+remb+imp,collecte:tcol,ecart,statut:statutFor(ecart).txt,espDepot:comptee.especes||0,hasControl:!!rec.control};}
 
 /* ---------- Contrôle : verrou + charger + enregistrer ---------- */
 function tryCtrlUnlock(){if($('ctrlPwd').value===MDP_CONTROLE){controlUnlocked=true;$('ctrlLock').style.display='none';$('ctrlContent').style.display='block';loadControl();}
@@ -548,6 +586,7 @@ async function loadControl(){
   $('ctrlSavedNote').textContent=rec.control?'Contrôle existant chargé':'Caisse accueil chargée';
   $('ctrlComment').value=rec.comment||'';
   fillRefunds(rec.refunds||[]);
+  fillUnpaids(rec.unpaids||[]);
   computeControl();
 }
 $('saveCtrlBtn').addEventListener('click',async()=>{
@@ -560,7 +599,7 @@ $('saveCtrlBtn').addEventListener('click',async()=>{
   rec.control={};
   ROWS.forEach(r=>{if(r.ctype!=='sum')rec.control[r.key]={beta:num('beta_'+r.key),zelty:num('zelty_'+r.key)};});
   ROWS.forEach(r=>{if(r.ctype==='sum')rec.control[r.key]={beta:r.sumOf.reduce((s,k)=>s+(rec.control[k]?rec.control[k].beta:0),0),zelty:r.sumOf.reduce((s,k)=>s+(rec.control[k]?rec.control[k].zelty:0),0)};});
-  rec.controlAt=new Date().toISOString();rec.comment=$('ctrlComment').value.trim();rec.refunds=getRefunds();rec.totals=recomputeTotals(rec);
+  rec.controlAt=new Date().toISOString();rec.comment=$('ctrlComment').value.trim();rec.refunds=getRefunds();rec.unpaids=getUnpaids();rec.totals=recomputeTotals(rec);
   currentRecord=rec;await putRecord(rec);
   $('ctrlSavedNote').textContent='Contrôle enregistré ✓ — '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   toast(`Contrôle ${SALLE} du ${date} enregistré ✓`);
@@ -594,11 +633,11 @@ async function renderArchives(){
   recs.forEach(rec=>{const t=rec.totals||{};const hasCtrl=t.hasControl;
     const a=Math.abs(t.ecart||0);const cls=!hasCtrl?'none':a<0.01?'ok':a<5?'warn':'err';const txt=!hasCtrl?'à contrôler':a<0.01?'OK':a<5?'⚠':'ÉCART';
     const d=new Date(rec.date).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short'});
-    const remb=refundTotal(rec.refunds);
+    const remb=refundTotal(rec.refunds);const imp=unpaidTotal(rec.unpaids);
     const cmt=(rec.comment||'').trim();
     const row=document.createElement('div');row.className='arch-row';
     row.innerHTML=`<span class="a-date">${d}</span><span class="badge ${cls}">${txt}</span>
-      <span class="a-tot">comptée ${eur(t.comptee||0)}${remb?' · remboursé '+eur(remb):''}${hasCtrl?' · écart '+signEur(t.ecart||0):''}</span>
+      <span class="a-tot">comptée ${eur(t.comptee||0)}${remb?' · remboursé '+eur(remb):''}${imp?' · impayés '+eur(imp):''}${hasCtrl?' · écart '+signEur(t.ecart||0):''}</span>
       <span class="a-spacer"></span><button data-load="${rec.date}">Ouvrir la saisie</button><button class="del" data-del="${rec.date}">🗑</button>
       ${cmt?`<div class="a-cmt">💬 ${esc(cmt)}</div>`:''}`;
     list.appendChild(row);});
@@ -620,7 +659,10 @@ function recapCtrl(){const r=computeControl();let t=`CONTRÔLE CAISSE — ${SALL
     else t+=`${x.label} : comptée ${eur(cm)} | BETA ${eur(b)} | ZELTY ${eur(z)}\n`;});
   t+=`\nTotal caisse comptée : ${eur(r.tc)}\n`;
   getRefunds().forEach(x=>{t+=`  Remboursement : ${eur(x.montant)}${x.motif?' — '+x.motif:''}\n`;});
-  t+=`Total remboursé : ${eur(r.remb)}\nTotal global : ${eur(r.glob)}\nTotal collecté : ${eur(r.tcol)}\n`;
+  t+=`Total remboursé : ${eur(r.remb)}\n`;
+  getUnpaids().forEach(x=>{t+=`  Impayé (${x.mode}) : ${eur(x.montant)}${x.motif?' — '+x.motif:''}\n`;});
+  t+=`Total impayés : ${eur(r.imp)} (CB ${eur(r.impCB)} · Espèces ${eur(r.impEsp)})\n`;
+  t+=`Total global : ${eur(r.glob)}\nTotal collecté : ${eur(r.tcol)}\n`;
   t+=`\nÉCART GLOBAL : ${signEur(r.ecart)} (${r.statut})`;
   const cmt=$('ctrlComment').value.trim();if(cmt)t+=`\n\nCommentaire : ${cmt}`;
   return t;}
@@ -633,7 +675,10 @@ $('csvCtrlBtn').addEventListener('click',()=>{const r=computeControl();const d=$
     else rows.push([x.label,cm.toFixed(2),b.toFixed(2),z.toFixed(2),'','']);});
   rows.push([]);rows.push(['Total caisse comptee',r.tc.toFixed(2)]);
   getRefunds().forEach(x=>rows.push(['Remboursement',(Number(x.montant)||0).toFixed(2),(x.motif||'').replace(/;/g,',')]));
-  rows.push(['Total rembourse',r.remb.toFixed(2)]);rows.push(['Total global',r.glob.toFixed(2)]);rows.push(['Total collecte',r.tcol.toFixed(2)]);
+  rows.push(['Total rembourse',r.remb.toFixed(2)]);
+  getUnpaids().forEach(x=>rows.push(['Impaye '+x.mode,(Number(x.montant)||0).toFixed(2),(x.motif||'').replace(/;/g,',')]));
+  rows.push(['Total impayes CB',r.impCB.toFixed(2)]);rows.push(['Total impayes Especes',r.impEsp.toFixed(2)]);rows.push(['Total impayes',r.imp.toFixed(2)]);
+  rows.push(['Total global',r.glob.toFixed(2)]);rows.push(['Total collecte',r.tcol.toFixed(2)]);
   rows.push(['Ecart global',r.ecart.toFixed(2)]);rows.push(['Statut',r.statut]);rows.push(['Commentaire',$('ctrlComment').value.trim().replace(/;/g,',').replace(/\n/g,' ')]);
   dl(rows,`controle_${SALLE}_${d}.csv`);});
 
