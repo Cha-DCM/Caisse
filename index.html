@@ -252,7 +252,7 @@
                 <tfoot>
                   <tr><td>Total caisse comptée</td><td class="r mono" id="tCompteeBrut">0,00 €</td><td colspan="5"></td></tr>
                   <tr><td>+ Total remboursé</td><td class="r mono" id="tRemb">0,00 €</td><td colspan="5"></td></tr>
-                  <tr><td>+ Total impayés</td><td class="r mono" id="tImp">0,00 €</td><td colspan="5" style="color:var(--muted);font-weight:400;font-size:12px" id="tImpDetail"></td></tr>
+                  <tr><td>− Total impayés</td><td class="r mono" id="tImp">0,00 €</td><td colspan="5" style="color:var(--muted);font-weight:400;font-size:12px" id="tImpDetail"></td></tr>
                   <tr><td>Total global</td><td class="r mono" id="tComptee">0,00 €</td><td colspan="2" class="r mono" id="tCollecte">0,00 €</td><td></td><td class="r mono" id="tEcart">0,00 €</td><td class="c" id="tStatut"></td></tr>
                 </tfoot>
               </table>
@@ -267,7 +267,7 @@
           </div>
           <div class="card">
             <h2 class="bo"><span class="dot"></span>Impayés</h2>
-            <p class="hint">Ventes non encaissées ce jour-là, avec le mode de paiement prévu. Elles s'ajoutent à la caisse comptée pour calculer le total global.</p>
+            <p class="hint">Ventes non encaissées ce jour-là, avec le mode de paiement prévu. Elles sont déduites de la caisse comptée pour calculer le total global.</p>
             <div id="unpaidList"></div>
             <button class="mini-btn" id="addUnpaidBtn" type="button" style="margin:6px 0 4px">+ Ajouter un impayé</button>
             <div class="field-row"><label>dont CB</label><span class="mono" id="unpaidCB">0,00 €</span></div>
@@ -285,7 +285,7 @@
             <h2 style="color:#fff"><span class="dot" style="background:var(--bo)"></span>Résultat du contrôle</h2>
             <div class="sum-line"><span class="lbl">Total caisse comptée</span><span class="val" id="rComptee">0,00 €</span></div>
             <div class="sum-line"><span class="lbl">+ Total remboursé</span><span class="val" id="rRemb">0,00 €</span></div>
-            <div class="sum-line"><span class="lbl">+ Total impayés</span><span class="val" id="rImp">0,00 €</span></div>
+            <div class="sum-line"><span class="lbl">− Total impayés</span><span class="val" id="rImp">0,00 €</span></div>
             <div class="sum-line"><span class="lbl">Total global</span><span class="val" id="rGlobal">0,00 €</span></div>
             <div class="sum-line"><span class="lbl">Total collecté</span><span class="val" id="rCollecte">0,00 €</span></div>
             <div class="sum-ecart ok" id="ecartBox"><span class="t-lbl">Écart global</span><span class="t-val" id="ecartGlobal">0,00 €</span><span class="t-st" id="statutGlobal">✓ Aucun écart</span></div>
@@ -465,15 +465,15 @@ function computeControl(){
     const s=statutFor(ec);const b=$('st_'+r.key);b.className='badge '+s.cls;b.textContent=s.txt;if(ord[s.cls]>ord[worst])worst=s.cls;});
   const remb=refundTotal(getRefunds());
   const unp=getUnpaids();const imp=unpaidTotal(unp),impCB=unpaidTotal(unp,'CB'),impEsp=unpaidTotal(unp,'Espèces');
-  const glob=tc+remb+imp;
+  const glob=tc+remb-imp;
   const ecart=glob-tcol;
   const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};
   set('tCompteeBrut',eur(tc));set('tRemb',eur(remb));set('refundTotal',eur(remb));
-  set('tImp',eur(imp));set('unpaidTotal',eur(imp));set('unpaidCB',eur(impCB));set('unpaidEsp',eur(impEsp));
+  set('tImp',imp?'−'+eur(imp):eur(0));set('unpaidTotal',eur(imp));set('unpaidCB',eur(impCB));set('unpaidEsp',eur(impEsp));
   set('tImpDetail',imp?`dont CB ${eur(impCB)} · Espèces ${eur(impEsp)}`:'');
   set('tComptee',eur(glob));set('tCollecte',eur(tcol));set('tEcart',signEur(ecart));
   const sg=statutFor(ecart);$('tStatut').innerHTML=`<span class="badge ${sg.cls}">${sg.txt}</span>`;
-  set('rComptee',eur(tc));set('rRemb',eur(remb));set('rImp',eur(imp));set('rGlobal',eur(glob));set('rCollecte',eur(tcol));set('ecartGlobal',signEur(ecart));
+  set('rComptee',eur(tc));set('rRemb',eur(remb));set('rImp',imp?'−'+eur(imp):eur(0));set('rGlobal',eur(glob));set('rCollecte',eur(tcol));set('ecartGlobal',signEur(ecart));
   // Sans remboursement ni impayé : statut = pire ligne (comportement d'origine). Sinon : statut de l'écart global corrigé.
   const boxCls=(remb>0||imp>0)?sg.cls:worst;
   $('ecartBox').className='sum-ecart '+boxCls;
@@ -565,7 +565,7 @@ function recomputeTotals(rec){const comptee=rec.comptee||{};const ctrl=rec.contr
   ROWS.forEach(r=>{if(!r.reconcile)return;tc+=comptee[r.key]||0;if(ctrl[r.key])tcol+=(ctrl[r.key].beta||0)+(ctrl[r.key].zelty||0);});
   const remb=refundTotal(rec.refunds); // anciennes caisses : pas de remboursements → 0
   const imp=unpaidTotal(rec.unpaids),impCB=unpaidTotal(rec.unpaids,'CB'),impEsp=unpaidTotal(rec.unpaids,'Espèces'); // anciennes caisses : pas d'impayés → 0
-  const ecart=tc+remb+imp-tcol;return{comptee:tc,rembourse:remb,impayes:imp,impayesCB:impCB,impayesEsp:impEsp,global:tc+remb+imp,collecte:tcol,ecart,statut:statutFor(ecart).txt,espDepot:comptee.especes||0,hasControl:!!rec.control};}
+  const ecart=tc+remb-imp-tcol;return{comptee:tc,rembourse:remb,impayes:imp,impayesCB:impCB,impayesEsp:impEsp,global:tc+remb-imp,collecte:tcol,ecart,statut:statutFor(ecart).txt,espDepot:comptee.especes||0,hasControl:!!rec.control};}
 
 /* ---------- Contrôle : verrou + charger + enregistrer ---------- */
 function tryCtrlUnlock(){if($('ctrlPwd').value===MDP_CONTROLE){controlUnlocked=true;$('ctrlLock').style.display='none';$('ctrlContent').style.display='block';loadControl();}
@@ -630,7 +630,7 @@ async function renderArchives(){
   }
   if(!recs.length){list.innerHTML='<div class="empty-state">Aucune caisse archivée pour cette salle.</div>';return;}
   recs.sort((a,b)=>b.date.localeCompare(a.date));list.innerHTML='';
-  recs.forEach(rec=>{const t=rec.totals||{};const hasCtrl=t.hasControl;
+  recs.forEach(rec=>{const t=rec.control?recomputeTotals(rec):(rec.totals||{});const hasCtrl=t.hasControl;
     const a=Math.abs(t.ecart||0);const cls=!hasCtrl?'none':a<0.01?'ok':a<5?'warn':'err';const txt=!hasCtrl?'à contrôler':a<0.01?'OK':a<5?'⚠':'ÉCART';
     const d=new Date(rec.date).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short'});
     const remb=refundTotal(rec.refunds);const imp=unpaidTotal(rec.unpaids);
